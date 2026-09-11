@@ -1,0 +1,13 @@
+{
+  "brave": {"containers": {
+    "enabled": true,
+    "list": [
+      {"id": "test-work", "name": "Work", "icon": 1, "background_color": -50122},
+      {"id": "test-personal", "name": "Personal", "icon": 0, "background_color": -12022529}
+    ],
+    "used": {
+      "test-work": {"id": "test-work", "name": "Previous work name", "icon": 1, "background_color": -50122},
+      "test-retained": {"id": "test-retained", "name": "Retired", "icon": 2, "background_color": -1}
+    }
+  }}
+}
