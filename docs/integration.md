@@ -49,3 +49,9 @@ No personal destinations were invented. The normal profile had no explicit enabl
 6. For a complete rerun, use a separate test data directory and initialize it through Brave. The probe is `swift scripts/probe.swift BRAVE_APP TEST_DATA PROFILE_DIRECTORY CONTAINER_NAME`. Enable and configure containers only through the test UI. Test a cold process, a running process, a URL batch, then rename and delete a disposable container. Wait for `cbc list` after each edit. The old generated app must follow the saved rename and show an error after saved deletion.
 
 After Brave/macOS/Choosy upgrades, repeat the routing checks. The gap between saved preference validation and Brave's in-memory launch handling remains unverified by design; see the README's limitations. macOS 14 and Intel hardware were not available for runtime testing.
+
+## Portable setup app
+
+The universal setup ZIP was extracted outside the checkout and launched on the Apple silicon test Mac. Its empty-state message and disabled install button were checked against the standard data location. Selecting the isolated test data folder discovered four configured destinations. Selecting Social and clicking Install destination generated a standalone app and revealed it in Finder. Its signature and both receiver architectures were verified. The temporary Social app was removed after this check.
+
+Both setup and bundled receiver compile for arm64 and x86_64; packaging checks both slices and the app signature. The 24 automated tests pass with the setup target included. The artifact contains no destination configuration or browser preferences. No Intel runtime, second Mac, downloaded-file Gatekeeper approval, or Choosy interaction was available for testing. Follow the README's target-Mac steps to complete those checks.

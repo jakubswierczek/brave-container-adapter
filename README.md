@@ -7,12 +7,28 @@ Each app contains the same native Swift receiver and its own destination configu
 ## Requirements and tested status
 
 - macOS 14 or later. Built and tested on macOS 26.6.2, Apple silicon.
-- Swift 6.0+; Xcode with Swift Testing for tests. Tested with Swift 6.3.3. The build is for the local architecture; Intel and macOS 14 runtime behavior have not been tested.
+- The downloadable setup app includes Apple silicon and Intel binaries. No Swift or Xcode installation is needed to run it. Intel and macOS 14 runtime behavior have not been tested.
+- Building from source requires Swift 6.0+; tests require Xcode with Swift Testing. Tested with Swift 6.3.3.
 - Brave with working Containers support. The installed **Brave 1.92.140 / Chromium 150.0.7871.125** binary was tested. Its macOS bundle version is `150.1.92.140`. Older versions are rejected; later versions are allowed but need a live routing check.
 - Containers enabled in **Brave Settings > Content > Containers**, with a saved container list. Create/edit containers only in Brave's UI.
 - Choosy for the picker. No changes to the system default browser are made by this project.
 
 The local environment had no discoverable Choosy installation and reported Safari as its HTTPS default. Choosy delivery has **not** been verified. See [the integration record](docs/integration.md) for exactly what was tested and what remains manual.
+
+## Use on another Mac
+
+1. On the target Mac, sign into the GitHub account that can access this private repository. Download `Brave-Container-Setup-universal.zip` from [Releases](https://github.com/jakubswierczek/choosy-brave-containers/releases/latest).
+2. Extract the ZIP, move **Brave Container Setup.app** to Applications, and open it. Requires macOS 14 or later.
+3. Install and initialize Brave and Choosy on that Mac. Enable Containers in Brave Settings > Content. Add or edit a container and let Brave save its settings.
+4. In the setup app, click **Refresh**, select a container/profile, then **Install destination**. Repeat for each destination. For nonstandard locations, use **Choose Brave…** and **Choose data folder…**; select the data folder containing `Local State`.
+5. Finder reveals the generated app in `~/Applications/Choosy Brave Containers/`. Drag it into **Choosy > Browsers**, or use Choosy's **+** application picker. Keep Choosy as the default browser.
+6. Open an external `https://example.com` link. Select the destination in Choosy and check the profile and container badge in Brave.
+
+The setup ZIP contains code and documentation, with no browser data or destination configuration. It discovers paths and containers on the Mac where it runs. **Transfer the setup app, not destination apps generated on another Mac.** You can quit or remove the setup app after installation; destination apps are standalone.
+
+The setup app is ad-hoc signed, **not Developer ID signed or notarized**. If macOS blocks its first launch, follow [Apple's Open Anyway instructions](https://support.apple.com/en-us/102445): first attempt to open the app, then use System Settings > Privacy & Security > Open Anyway and confirm. Only approve the artifact obtained from this repository. Do not disable Gatekeeper globally. Download/quarantine approval has not been tested here.
+
+To update, download the newer setup app, quit the relevant destination receiver in Activity Monitor, and install the same destination again. Its bundle identity and existing filename stay stable. Container renames need no update for routing; reinstall to refresh the label.
 
 ## Build and test
 
@@ -20,6 +36,8 @@ The local environment had no discoverable Choosy installation and reported Safar
 scripts/test.sh
 scripts/build.sh
 dist/bin/cbc help
+# Optional: package the portable GUI for both Mac architectures
+scripts/package-setup.sh
 ```
 
 The scripts select `/Applications/Xcode.app` for that invocation if `DEVELOPER_DIR` is unset. They do not change `xcode-select`. Apple's standalone Command Line Tools can build the executables but may omit the `Testing` module. For a different Xcode installation:
@@ -94,7 +112,7 @@ dist/bin/cbc generate \
   --output ./dist/apps
 ```
 
-`install` registers each app with Launch Services but does not set it as a default handler. Bundles are ad-hoc signed locally, not Developer ID signed or notarized for distribution. Configuration is local plaintext with owner-only file permissions; do not upload generated bundles. Build on each target Mac and generate apps for its own paths.
+`install` registers each app with Launch Services but does not set it as a default handler. Bundles are ad-hoc signed locally, not Developer ID signed or notarized for distribution. Configuration is local plaintext with owner-only file permissions; do not upload generated bundles. Run the portable setup app on each target Mac, or build the CLI there, and generate apps for its own paths.
 
 ## Add apps to Choosy
 
