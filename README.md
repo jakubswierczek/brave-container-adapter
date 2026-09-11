@@ -1,0 +1,180 @@
+# Choosy Brave Containers
+
+Generate standalone macOS apps that send HTTP and HTTPS links to one Brave installation, user data directory, profile, and container. Add those apps to **your existing Choosy picker**.
+
+Each app contains the same native Swift receiver and its own destination configuration, icon, label, and stable bundle ID. It invokes Brave's executable directly with `Process`; there is no shell, backend, separate picker, rules engine, or remote-debugging port.
+
+## Requirements and tested status
+
+- macOS 14 or later. Built and tested on macOS 26.6.2, Apple silicon.
+- Swift 6.0+; Xcode with Swift Testing for tests. Tested with Swift 6.3.3. The build is for the local architecture; Intel and macOS 14 runtime behavior have not been tested.
+- Brave with working Containers support. The installed **Brave 1.92.140 / Chromium 150.0.7871.125** binary was tested. Its macOS bundle version is `150.1.92.140`. Older versions are rejected; later versions are allowed but need a live routing check.
+- Containers enabled in **Brave Settings > Content > Containers**, with a saved container list. Create/edit containers only in Brave's UI.
+- Choosy for the picker. No changes to the system default browser are made by this project.
+
+The local environment had no discoverable Choosy installation and reported Safari as its HTTPS default. Choosy delivery has **not** been verified. See [the integration record](docs/integration.md) for exactly what was tested and what remains manual.
+
+## Build and test
+
+```bash
+scripts/test.sh
+scripts/build.sh
+dist/bin/cbc help
+```
+
+The scripts select `/Applications/Xcode.app` for that invocation if `DEVELOPER_DIR` is unset. They do not change `xcode-select`. Apple's standalone Command Line Tools can build the executables but may omit the `Testing` module. For a different Xcode installation:
+
+```bash
+DEVELOPER_DIR=/path/to/Xcode.app/Contents/Developer scripts/test.sh
+```
+
+The build places `cbc` and `ContainerReceiver` together in `dist/bin`. Keep them together when moving the CLI, or specify `--receiver /absolute/path/to/ContainerReceiver`. Generated apps copy the receiver into `Contents/MacOS`; they do not depend on `dist`, `.build`, or this checkout. Runtime dependencies are system frameworks and Swift libraries.
+
+## Discover profiles and containers
+
+```bash
+dist/bin/cbc list
+dist/bin/cbc list --profile 'Profile 1'
+dist/bin/cbc doctor
+```
+
+Standard locations:
+
+- Installation: `/Applications/Brave Browser.app`
+- Data: `~/Library/Application Support/BraveSoftware/Brave-Browser`
+
+Every discovery/generation command accepts overrides:
+
+```bash
+dist/bin/cbc list \
+  --brave '/Applications/Brave Browser.app' \
+  --user-data-dir "$HOME/Library/Application Support/BraveSoftware/Brave-Browser"
+```
+
+`Local State` → `profile.info_cache` supplies the profile **directory key** and display name. Pass `Default` or `Profile 1` to `--profile`, not a display name such as `Personal`.
+
+The selected profile's `Preferences` contains nested `brave.containers` data:
+
+| Key | Meaning |
+| --- | --- |
+| `enabled` | Explicit saved enablement; this adapter requires `true` |
+| `list` | Configured containers, each with `id`, `name`, integer `icon` and `background_color` |
+| `used` | Dictionary keyed by ID; retained local snapshots, including potentially deleted containers |
+
+Only configured entries become destinations. Retained entries are counted separately. A retained-only ID is rejected. Brave searches configured names before retained names, so a retained name does not shadow a configured destination. Duplicate **configured** names block that name's launch; duplicate IDs or malformed records block discovery.
+
+### Built-in containers and delayed saves
+
+Brave may show its built-in Personal/Work/Social/School containers while `list` is absent from the file. These are localized runtime defaults, not evidence that `used` is the configured list. **Add a container or edit and save one in Brave's UI**, then wait until `cbc list` shows the configured entries. The adapter does not guess localized names or synthesize default records. Similarly, absent `enabled` is treated as unconfirmed, even if a Brave experiment enables the UI by default.
+
+Brave writes preferences asynchronously. `cbc list` shows the saved state, which can lag the UI. After changing container settings, wait for the new state to appear before opening links. Close/reopen the test browser if a save does not appear. The reader retries failed, partial, or changing file reads three times; it never writes these files.
+
+## Generate and install
+
+Copy a container ID from `list`:
+
+```bash
+dist/bin/cbc install --profile Default --container-id CONTAINER_ID
+```
+
+Or install all enabled, saved destinations:
+
+```bash
+dist/bin/cbc install --all
+dist/bin/cbc install --all --profile 'Profile 1'
+```
+
+Apps go into `~/Applications/Choosy Brave Containers/`. Labels include the container, profile display name, and directory key, for example `Brave — Work (Personal · Default)`. Filenames include a short destination hash to avoid collisions. Use `--name 'Brave — RMPL (Work profile)'` for a custom single-destination label.
+
+To package without installing/registering:
+
+```bash
+dist/bin/cbc generate \
+  --profile Default --container-id CONTAINER_ID \
+  --output ./dist/apps
+```
+
+`install` registers each app with Launch Services but does not set it as a default handler. Bundles are ad-hoc signed locally, not Developer ID signed or notarized for distribution. Configuration is local plaintext with owner-only file permissions; do not upload generated bundles. Build on each target Mac and generate apps for its own paths.
+
+## Add apps to Choosy
+
+1. Open Choosy settings and select **Browsers**.
+2. In Finder, open `~/Applications/Choosy Brave Containers/`.
+3. Drag the desired `.app` files into Choosy's browser list. Alternatively click **+**, choose the option to browse for an application, and select each generated app.
+4. Keep Choosy as your default browser. Do not select a generated destination as the system default.
+5. Open an external test link, select the destination, and verify both the Brave profile and container badge.
+
+These steps follow [Choosy's application-picker documentation](https://choosy.app/help/settings/browsers). The generated app is an application entry; it is not added through Choosy's Brave profile submenu.
+
+The adapter handles **links routed through Choosy**. Ordinary navigation, page links, address-bar input, and new tabs inside an existing browser do not automatically pass through Choosy.
+
+## URL delivery and errors
+
+The app declares HTTP/HTTPS URL handling and runs as an AppKit accessory app. It has no normal window or persistent Dock icon. It stays resident until quit/logout so an idle timeout cannot discard a late URL event. Multiple events and batched URLs are supported; repeated URLs are not deduplicated. Incoming events received during an error alert are queued.
+
+The receiver validates the entire incoming batch, loads its destination, reads the latest saved preferences, resolves the configured ID to its current name, and constructs:
+
+```text
+/path/to/Brave.app/Contents/MacOS/Brave Browser
+  --user-data-dir=/path/to/data
+  --profile-directory=Default
+  --container=Current Name
+  --
+  https://example.com/...
+```
+
+These are separate `Process.arguments` elements, not a shell command. `open -a Brave --args` is not used. Brave handles its existing-instance handoff. The adapter also checks the data directory's singleton owner and rejects a different running installation. Activation targets that browser process after the handoff; a live check must still confirm the intended profile window.
+
+HTTP/HTTPS text from raw URL Apple events is passed unchanged after validation, including percent escapes, Unicode, queries and fragments. AppKit-batched URLs use the representation AppKit supplies; the adapter cannot undo normalization already performed by a sender or macOS. Unsupported schemes, invalid escapes, whitespace/control characters, and empty hosts are rejected. Batches larger than the conservative 128 KiB argument budget are rejected with an error; split them into smaller batches.
+
+Errors appear in a native alert. The CLI prints metadata diagnostics to the terminal. Neither logs incoming URLs or query values. Brave stdout/stderr are suppressed. `list` and `doctor` intentionally display local profile/container names and IDs; review those before sharing diagnostics. Normal OS process inspection can see command-line arguments, and Brave itself handles the URLs as usual.
+
+## Diagnose routing
+
+```bash
+dist/bin/cbc doctor --profile Default --container-id CONTAINER_ID
+dist/bin/cbc doctor --app '/path/to/generated.app'
+```
+
+`doctor` is read-only. It validates installation, metadata, feature-disable flag, and identity, and reports the current HTTPS default. It does **not** send a URL or certify GUI routing.
+
+Check these in order:
+
+1. Installation and data paths still exist; the chosen profile was already initialized in Brave.
+2. Containers is enabled in Settings. If `brave://flags/#containers` explicitly disables the feature, enable it there and relaunch Brave. The adapter does not change flags or force-enable features on a running process.
+3. `list` contains the ID and its current name. Wait for UI edits to reach disk.
+4. No two configured containers in the profile have that name.
+5. No other Brave installation owns the same user data directory.
+6. Test delivery to the app independently of Choosy:
+
+   ```bash
+   open -a '/path/to/generated.app' 'https://example.com/?check=one#part'
+   ```
+
+   This sends a URL event to the **receiver**, which then invokes Brave directly. Verify the profile and badge in Brave. A successful `open`, `Process.run`, or zero process exit status alone does not prove correct routing.
+
+## Update and uninstall
+
+Rebuild, quit the destination's `ContainerReceiver` process in Activity Monitor, then repeat the original `install` command. Select the process whose executable is inside that destination app if several receivers run. The generator refuses to replace a running receiver. It locks the output directory, stages and verifies the new bundle, then swaps it atomically. Unrelated apps and symlinks are not overwritten.
+
+Identity is a SHA-256 digest of the canonical installation path, data path, profile directory, and container ID. Changing only a container or profile display name preserves identity. Launches follow a renamed container without regeneration after its new name is saved; regenerate to refresh the label. Existing app filenames are preserved during updates so Choosy's application reference remains usable. A moved installation/data directory or recreated container is a new destination; remove the old Choosy entry and app.
+
+To uninstall, remove the entry from Choosy's Browsers list, quit its receiver in Activity Monitor, and move the generated app to Trash. Remove `dist/bin` if you no longer need the CLI. The adapter installs no login item, daemon, backend, or browser extension. Uninstalling an app does not delete its Brave profile or container.
+
+## Limits and guarantees
+
+- Discovery depends on **Brave's internal preference storage format**, not a supported external API. Future Brave changes may require an adapter update.
+- Launching currently relies on **container names**, even though destination configuration stores an ID. The inspected implementation compares names exactly and uses the first matching configured record.
+- There is an unavoidable gap between saved-file validation and Brave processing the request. In-memory state can differ from disk; flags, profile selection, container names, deletion, or enablement can change during that gap. A missed name can cause Brave itself to open an ordinary tab or use a retained record. The adapter never intentionally selects a fallback, but **cannot guarantee isolation across this race or verify the final tab**. This is not a security boundary. After changes, wait for saved state; verify badges before sensitive browsing.
+- Effective feature rollout/command-line overrides cannot be fully inferred from saved files. Explicit `containers@2` is rejected, but a contradictory running-process flag or future rollout change still needs a GUI check.
+- Browser startup/onboarding, a profile picker, crash recovery, a locked profile, or a broken Brave process can interrupt handoff. Initialize each profile manually before generating apps. The CLI does not read cookies, history, or internal Mojo settings interfaces.
+- Native UI tests used an isolated copy of the installed Brave binary with a distinct bundle identifier and ad-hoc signature, because the GUI tool otherwise selected the personal instance. See the integration record for this test boundary.
+
+## Source references
+
+The supplied 1.94.121 references were compared with the installed version's **1.92.140 tag**, rather than assuming `main` or a newer release was installed:
+
+- [Startup command-line container handling](https://github.com/brave/brave-core/blob/v1.92.140/browser/ui/startup/brave_startup_tab_provider_impl.cc)
+- [Preference keys](https://github.com/brave/brave-core/blob/v1.92.140/components/containers/core/browser/pref_names.h) and [serialization](https://github.com/brave/brave-core/blob/v1.92.140/components/containers/core/browser/prefs.cc)
+- [Configured-first runtime lookup](https://github.com/brave/brave-core/blob/v1.92.140/components/containers/core/browser/containers_service.cc)
+- [Preference defaults](https://github.com/brave/brave-core/blob/v1.92.140/components/containers/core/browser/prefs_registration.cc) and [localized default containers](https://github.com/brave/brave-core/blob/v1.92.140/components/containers/core/browser/default_containers_list.cc)
