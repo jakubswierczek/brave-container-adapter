@@ -28,6 +28,8 @@ The setup ZIP contains code and documentation, with no browser data or destinati
 
 The setup app is ad-hoc signed, **not Developer ID signed or notarized**. If macOS blocks its first launch, follow [Apple's Open Anyway instructions](https://support.apple.com/en-us/102445): first attempt to open the app, then use System Settings > Privacy & Security > Open Anyway and confirm. Only approve the artifact obtained from this repository. Do not disable Gatekeeper globally. Download/quarantine approval has not been tested here.
 
+For a Developer ID release, see [signing and notarization](docs/signing.md). The release script requires a local company or individual signing identity and saved notarization credentials. The published v1.1.0 ZIP remains ad-hoc signed until that process succeeds.
+
 To update, download the newer setup app, quit the relevant destination receiver in Activity Monitor, and install the same destination again. Its bundle identity and existing filename stay stable. Container renames need no update for routing; reinstall to refresh the label.
 
 ## Build and test
