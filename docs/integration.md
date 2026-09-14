@@ -150,3 +150,24 @@ To repeat the temporary checks on a target Mac:
 
 The version and saved-preference guards do not remove the race with Brave's
 in-memory state or prove final-tab isolation. Repeat these checks after updates.
+
+
+### Temporary release signing and distribution
+
+Version **1.2.0/build 5**, including the icon, was built from
+`fada72f13c036da6774525c4cec866f6a11e2887`. Apple's submission
+`ea67ed5d-e5a1-4809-bfad-23c9782c906b` returned `Accepted`; its report says
+`Ready for distribution` with no issues. Both executable signatures use
+Developer ID, secure timestamps, and Hardened Runtime.
+
+The final ZIP passed the browser-data/private-path scan, both architecture
+checks, strict signatures, ticket validation, and Gatekeeper assessment as
+`Notarized Developer ID`. The extracted signed setup app also opened outside the
+checkout and displayed its native window. The ZIP and checksum are published in
+[v1.2.0](https://github.com/jakubswierczek/choosy-brave-containers/releases/tag/v1.2.0).
+
+A fresh GitHub CLI download reproduced the checksum, signatures, ticket, and
+Gatekeeper results, and verified the version and icon declaration. ZIP SHA-256:
+`c0c6536be20b0d684e8215e824aee08895c50bcef8a0d385b9e8a2d04b5791e2`.
+Browser-download quarantine, another Mac, Intel runtime, and Choosy interaction
+remain manual checks.

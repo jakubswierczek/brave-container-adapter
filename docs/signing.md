@@ -1,6 +1,6 @@
 # Developer ID signing
 
-The v1.1.1 and v1.1.2 ZIPs are Developer ID signed and notarized. The older v1.1.0 ZIP is ad-hoc signed. Developer ID releases use the `-notarized.zip` filename. An individual or company Apple Developer Program membership can provide Developer ID signing, but membership alone does not install a certificate or grant certificate creation rights.
+The v1.1.1, v1.1.2, and v1.2.0 ZIPs are Developer ID signed and notarized. The older v1.1.0 ZIP is ad-hoc signed. Developer ID releases use the `-notarized.zip` filename. An individual or company Apple Developer Program membership can provide Developer ID signing, but membership alone does not install a certificate or grant certificate creation rights.
 
 Apple lists **Account Holder** as the role required to create a Developer ID certificate. Some admins have access to cloud-managed certificates. This script needs a **local Developer ID Application certificate and its private key**; an Apple Development certificate or cloud-only identity does not satisfy it. See [Apple's certificate instructions](https://developer.apple.com/help/account/certificates/create-developer-id-certificates).
 
