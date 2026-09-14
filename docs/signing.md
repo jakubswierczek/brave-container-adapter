@@ -35,7 +35,7 @@ The script verifies the identity and saved credentials before building. It signs
 
 Each attempt stays in an ignored `dist/notarization.XXXXXX/` directory. A successful attempt contains `Brave-Container-Setup-notarized.zip` and its SHA-256 file. Failed or timed-out attempts retain `result.json` and the submitted app for diagnosis. A timeout does not cancel Apple's processing. Use the submission ID with `xcrun notarytool info` or `log` and the same Keychain profile before deciding to resubmit. The script does not publish releases or overwrite a previous attempt.
 
-After success, test the ZIP downloaded onto another Mac and publish that exact ZIP/checksum. Confirm that setup opens and can install a destination, then check Choosy routing. A local Gatekeeper assessment alone does not prove a clean download works.
+After success, test the ZIP downloaded onto another Mac and publish that exact ZIP/checksum. Confirm that setup opens and can install a destination, then check browser-switcher routing. A local Gatekeeper assessment alone does not prove a clean download works.
 
 ## Check submission status
 

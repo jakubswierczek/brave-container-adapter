@@ -171,3 +171,55 @@ Gatekeeper results, and verified the version and icon declaration. ZIP SHA-256:
 `c0c6536be20b0d684e8215e824aee08895c50bcef8a0d385b9e8a2d04b5791e2`.
 Browser-download quarantine, another Mac, Intel runtime, and Choosy interaction
 remain manual checks.
+
+## App appearance and general browser switchers v1.3.0, 2026-09-14
+
+The setup interface and current README now describe Brave destinations for
+browser switchers that accept custom macOS applications. New apps install in
+`~/Applications/Brave Destinations/`. Existing bundle identifiers are unchanged;
+older app folders remain discoverable for in-place updates. Historical records
+above retain the product and folder names used during those tests.
+
+`scripts/test.sh` passed **40 tests**. New tests cover legacy suffix removal,
+repeat saves after renaming, unchanged launch arguments and destination identity,
+filename collision protection, custom-image aspect ratio and transparency,
+source-image removal, name-only updates preserving custom icons, six distinct
+presets, invalid images and names, and rejection of unrelated apps and symlinks.
+The tests caught a `/var` versus `/private/var` alias comparison issue in repeat
+saves; location comparisons now normalize both paths.
+
+Optimized and universal builds passed. CLI smoke checks covered `customize`,
+invalid option combinations, renaming, stored presets, stable destination data,
+and strict app signatures. The CLI initially received SIGKILL after an in-place
+executable copy despite valid signature verification; a fresh inode ran normally.
+The build script now stages and replaces executables rather than overwriting
+existing inodes. Its installed CLI then passed the startup and command checks.
+
+The universal setup app was extracted outside the checkout and tested through
+native macOS UI:
+
+- Opened a disposable older app through **Edit installed app…**. Its saved label
+  and icon loaded. **Short name** plus **Save app** removed the filename hash and
+  profile suffix while preserving its destination and bundle ID.
+- Selected the generated Temporary icon, inspected its preview, and saved it.
+- Imported the project's PNG artwork through **Choose image…**, inspected the
+  preview, and saved it with a new name. The saved app's custom icon metadata and
+  strict signature passed checks. PNG was exercised live; the other accepted
+  import formats were not separately checked in the GUI.
+- Sent a neutral URL to that renamed app. The isolated Brave 1.95.101 copy opened
+  Default/Personal with the fresh Shuffle perfect badge. Its query and fragment
+  were visible in the address bar.
+- Created a new Work destination through the setup UI, with a custom app name and
+  the Work icon, in the new dedicated install folder. The layout and preview were
+  inspected visually.
+- Used CLI `customize` to change that app's name and preset. It kept its routing
+  identity, passed signature verification, and opened a Work tab in the correct
+  isolated profile.
+
+These checks reused the isolated Brave copy and test data described above.
+Browser preference access remained read-only. The new installed test app was
+removed from Applications after verification; existing demonstration apps and
+personal profiles were preserved. Third-party switcher cache behavior, another
+Mac, Intel runtime, and browser-download quarantine remain manual checks. After
+renaming an app, remove and re-add its switcher entry if the old name, icon, or
+path remains cached.

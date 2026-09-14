@@ -1,6 +1,6 @@
-# Choosy Brave Containers
+# Brave Destinations
 
-Generate standalone macOS apps that send HTTP and HTTPS links to one Brave installation, user data directory, profile, and either a saved container or a fresh temporary container. Add those apps to **your existing Choosy picker**.
+Generate standalone macOS apps that send HTTP and HTTPS links to one Brave installation, user data directory, profile, and either a saved container or a fresh temporary container. Add those apps to your existing browser switcher, launcher, or another tool that opens URLs with a macOS application.
 
 Each app contains the same native Swift receiver and its own destination configuration, icon, label, and stable bundle ID. It invokes Brave's executable directly with `Process`; there is no shell, backend, separate picker, rules engine, or remote-debugging port.
 
@@ -11,18 +11,18 @@ Each app contains the same native Swift receiver and its own destination configu
 - Building from source requires Swift 6.0+; tests require Xcode with Swift Testing. Tested with Swift 6.3.3.
 - Brave with working Containers support. Named routing requires **1.92.140+**. Temporary routing requires **1.95.101+** and was tested against the installed `153.1.95.101` macOS bundle. The original named-routing checks used 1.92.140. Repeat live routing checks after upgrades.
 - Containers enabled in **Brave Settings > Content > Containers**, with enablement saved to disk. Named destinations also require a saved container list. Create/edit containers only in Brave's UI.
-- Choosy for the picker. No changes to the system default browser are made by this project.
+- For browser selection, use a switcher that accepts custom macOS applications and sends HTTP/HTTPS URL events. Compatibility with every switcher is not guaranteed. This project does not change the system default browser.
 
-The local environment had no discoverable Choosy installation and reported Safari as its HTTPS default. Choosy delivery has **not** been verified. See [the integration record](docs/integration.md) for exactly what was tested and what remains manual.
+The local environment reported Safari as its HTTPS default. A third-party browser switcher was unavailable; switcher delivery has **not** been verified. See [the integration record](docs/integration.md) for exactly what was tested and what remains manual.
 
 ## Use on another Mac
 
 1. On the target Mac, sign into the GitHub account that can access this private repository. Download `Brave-Container-Setup-notarized.zip` from [Releases](https://github.com/jakubswierczek/choosy-brave-containers/releases/latest). It includes Apple silicon and Intel binaries. The older v1.1.0 release uses the ad-hoc signed `Brave-Container-Setup-universal.zip` instead.
 2. Extract the ZIP, move **Brave Container Setup.app** to Applications, and open it. Requires macOS 14 or later.
-3. Install and initialize Brave and Choosy on that Mac. Enable Containers in Brave Settings > Content and let Brave save its settings. For named destinations, also add or edit a container.
-4. In the setup app, click **Refresh**, select a named container or **Temporary** for the desired profile, then **Install destination**. Repeat for each destination. For nonstandard locations, use **Choose Brave…** and **Choose data folder…**; select the data folder containing `Local State`.
-5. Finder reveals the generated app in `~/Applications/Choosy Brave Containers/`. Drag it into **Choosy > Browsers**, or use Choosy's **+** application picker. Keep Choosy as the default browser.
-6. Open an external `https://example.com` link. Select the destination in Choosy and check the profile and container badge in Brave.
+3. Install and initialize Brave and your preferred browser switcher on that Mac. Enable Containers in Brave Settings > Content and let Brave save its settings. For named destinations, also add or edit a container.
+4. In the setup app, click **Refresh**, select a named container or **Temporary** for the desired profile, enter an **App name**, choose an icon, then click **Install destination**. Repeat for each destination. For nonstandard locations, use **Choose Brave…** and **Choose data folder…**; select the data folder containing `Local State`.
+5. Finder reveals the generated app in `~/Applications/Brave Destinations/`. Add it through your browser switcher's application picker or drag and drop if supported. Keep that switcher as the default browser.
+6. Open an external `https://example.com` link. Select the destination in your switcher and check the profile and container badge in Brave.
 
 The setup ZIP contains code and documentation, with no browser data or destination configuration. It discovers paths and containers on the Mac where it runs. **Transfer the setup app, not destination apps generated on another Mac.** You can quit or remove the setup app after installation; destination apps are standalone.
 
@@ -30,7 +30,7 @@ The `-notarized.zip` distribution contains a Developer ID signed setup app with 
 
 For release signing, see [signing and notarization](docs/signing.md). The release script requires a local company or individual signing identity and saved notarization credentials. Destination apps generated on your Mac retain local ad-hoc signatures; they do not inherit the setup app's notarization ticket.
 
-To update, download the newer setup app, quit the relevant destination receiver in Activity Monitor, and install the same destination again. Its bundle identity and existing filename stay stable. Container renames need no update for routing; reinstall to refresh the label.
+To update or customize an existing app, download the newer setup app, quit its destination receiver in Activity Monitor, then use **Edit installed app…** and **Save app**. The bundle identity stays stable. Saving applies the app name to its filename and removes old generated suffixes. Re-add the app in your switcher if it caches the old path, name, or icon. Renaming an actual container in Brave needs no adapter update for routing.
 
 ## Build and test
 
@@ -104,7 +104,7 @@ dist/bin/cbc install --all
 dist/bin/cbc install --all --profile 'Profile 1'
 ```
 
-Apps go into `~/Applications/Choosy Brave Containers/`. Labels include the container, profile display name, and directory key, for example `Brave — Work (Personal · Default)`. Filenames include a short destination hash to avoid collisions. Use `--name 'Brave — RMPL (Work profile)'` for a custom single-destination label.
+New apps go into `~/Applications/Brave Destinations/`. The setup picker shows the profile name and directory separately from the editable app name. The CLI includes profile information in its default label; use `--name 'Brave — Work'` to choose a shorter one. Filenames use that label without an automatic hash suffix. If a filename is taken, choose another name; unrelated apps are never overwritten. Apps from older releases update in their original folder.
 
 To package without installing/registering:
 
@@ -118,7 +118,7 @@ dist/bin/cbc generate \
 
 ## Temporary containers
 
-In the setup app, choose **Brave — Temporary (profile · directory)** and install it. Add that generated app to Choosy like any named destination. Requires Brave **1.95.101 or later**.
+In the setup app, choose **Brave — Temporary (profile · directory)** and install it. Add that generated app to your browser switcher like any named destination. Requires Brave **1.95.101 or later**.
 
 CLI equivalents:
 
@@ -134,17 +134,44 @@ Brave chooses the container's random display name and manages its data. **Tempor
 
 The generated app stores the temporary mode, installation, data path, and profile. It stores no ephemeral container ID or name. Saved enablement, metadata, and the installed Brave version are checked again before every request. A missing configured list is allowed; malformed metadata, disabled containers, missing profiles, or an unsupported version stop the request.
 
-## Add apps to Choosy
+## Names and icons
 
-1. Open Choosy settings and select **Browsers**.
-2. In Finder, open `~/Applications/Choosy Brave Containers/`.
-3. Drag the desired `.app` files into Choosy's browser list. Alternatively click **+**, choose the option to browse for an application, and select each generated app.
-4. Keep Choosy as your default browser. Do not select a generated destination as the system default.
-5. Open an external test link, select the destination, and verify both the Brave profile and container badge.
+The setup app lets you customize new or installed destination apps:
 
-These steps follow [Choosy's application-picker documentation](https://choosy.app/help/settings/browsers). The generated app is an application entry; it is not added through Choosy's Brave profile submenu.
+1. Select a destination, or click **Edit installed app…** and select an existing generated app.
+2. Enter the desired **App name**. **Short name** uses the current container name without profile text. Saving removes old filename hashes; it does not rename the container in Brave.
+3. Choose one of six locally generated icons: **Monogram**, **Work**, **Personal**, **Web**, **Layers**, or **Temporary**. The preview shows your choice. Monogram uses the first two letters of the app name after the standard Brave prefix.
+4. Or click **Choose image…** to import PNG, JPEG, HEIC, TIFF, or ICNS. Images must be at most 32 MB and 16384 pixels per side. The image is fitted within a square without cropping. The app stores a normalized icon, not the source path or its metadata; the original image is no longer needed.
+5. Click **Install destination** or **Save app**. Re-add the app to the switcher if its entry still shows the old name or icon.
 
-The adapter handles **links routed through Choosy**. Ordinary navigation, page links, address-bar input, and new tabs inside an existing browser do not automatically pass through Choosy.
+CLI examples:
+
+```bash
+dist/bin/cbc install --profile Default --container-id CONTAINER_ID \
+  --name 'Brave — Work' --icon work
+
+dist/bin/cbc customize --app '/path/to/generated.app' \
+  --name 'Brave — Personal' --icon personal
+
+dist/bin/cbc customize --app '/path/to/generated.app' \
+  --icon-file '/path/to/icon.png'
+```
+
+Use `--icon` or `--icon-file`, not both. When neither is supplied, updates keep the saved icon. Name-only changes also preserve custom icons. CLI updates keep the current filename unless `--name` is supplied; the setup app always applies the visible name when saving. Two different destinations can share a display name in different folders, but cannot use the same filename in one folder.
+
+Appearance changes keep the installation, data directory, profile directory, container ID or temporary mode, and bundle identifier. Editing an installed app does not require its Brave installation to be available; the receiver validates routing when a URL arrives. All operations on Brave preferences remain read-only.
+
+## Add apps to a browser switcher
+
+1. Open the switcher's browser/application settings.
+2. Use its application picker to select the generated `.app` in `~/Applications/Brave Destinations/`. If supported, drag the app from Finder into that list.
+3. Add it as a custom application, rather than through a built-in Brave profile submenu.
+4. Keep the switcher as your default browser. Do not make a generated destination the system default.
+5. Open an external test link, select the destination, and verify the Brave profile and container badge.
+
+The sender must support custom macOS apps and deliver standard HTTP/HTTPS URL events. A switcher that only accepts its own fixed browser list may need support from its developer. The adapter supplies no picker or routing rules of its own.
+
+The adapter handles **links sent to its destination apps**. Ordinary navigation, page links, address-bar input, and new tabs inside an existing browser do not automatically pass through a system browser switcher.
 
 ## URL delivery and errors
 
@@ -185,7 +212,7 @@ Check these in order:
 3. For a named destination, `list` contains the ID and its current name. For Temporary, Brave is at least 1.95.101 and saved enablement is true. Wait for UI edits to reach disk.
 4. For a named destination, no two configured containers in the profile have that name.
 5. No other Brave installation owns the same user data directory.
-6. Test delivery to the app independently of Choosy:
+6. Test delivery to the app independently of the browser switcher:
 
    ```bash
    open -a '/path/to/generated.app' 'https://example.com/?check=one#part'
@@ -195,11 +222,11 @@ Check these in order:
 
 ## Update and uninstall
 
-Rebuild, quit the destination's `ContainerReceiver` process in Activity Monitor, then repeat the original `install` command. Select the process whose executable is inside that destination app if several receivers run. The generator refuses to replace a running receiver. It locks the output directory, stages and verifies the new bundle, then swaps it atomically. Unrelated apps and symlinks are not overwritten.
+Rebuild, quit the destination's `ContainerReceiver` process in Activity Monitor, then repeat the original `install` command. Select the process whose executable is inside that destination app if several receivers run. The generator refuses to replace a running receiver. Older generated apps are recognized by their unchanged bundle IDs and can be selected with **Edit installed app…**. It locks the output directory, stages and verifies the new bundle, then swaps it atomically. Unrelated apps and symlinks are not overwritten.
 
-Named destination identity is a SHA-256 digest of the canonical installation path, data path, profile directory, and container ID. Temporary identity uses the same paths/profile plus a separate temporary-mode identity. Existing named configuration (format 1) and bundle IDs are unchanged; temporary apps use format 2. Old receivers reject the new format. Changing only a container or profile display name preserves identity. Launches follow a renamed container without regeneration after its new name is saved; regenerate to refresh the label. Existing app filenames are preserved during updates so Choosy's application reference remains usable. A moved installation/data directory or recreated container is a new destination; remove the old Choosy entry and app.
+Named destination identity is a SHA-256 digest of the canonical installation path, data path, profile directory, and container ID. Temporary identity uses the same paths/profile plus a separate temporary-mode identity. Existing named configuration (format 1) and bundle IDs are unchanged; temporary apps use format 2. Old receivers reject the new format. Changing only a container or profile display name preserves identity. Launches follow a renamed container without regeneration after its new name is saved; regenerate to refresh the label. CLI updates preserve filenames unless `--name` is supplied. Setup saves use the visible app name, without a hash suffix. A switcher may need its app entry refreshed after a filename or icon change. A moved installation/data directory or recreated container is a new destination; remove the old switcher entry and app.
 
-To uninstall, remove the entry from Choosy's Browsers list, quit its receiver in Activity Monitor, and move the generated app to Trash. Remove `dist/bin` if you no longer need the CLI. The adapter installs no login item, daemon, backend, or browser extension. Uninstalling an app does not delete its Brave profile or container.
+To uninstall, remove the entry from the switcher's application list, quit its receiver in Activity Monitor, and move the generated app to Trash. Remove `dist/bin` if you no longer need the CLI. The adapter installs no login item, daemon, backend, or browser extension. Uninstalling an app does not delete its Brave profile or container.
 
 ## Limits and guarantees
 

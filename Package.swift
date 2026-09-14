@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "choosy-brave-containers",
+    name: "brave-destinations",
     platforms: [.macOS(.v14)],
     products: [
         .executable(name: "cbc", targets: ["CBC"]),

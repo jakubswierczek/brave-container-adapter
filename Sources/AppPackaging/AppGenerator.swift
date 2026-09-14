@@ -6,14 +6,61 @@ import Foundation
 @MainActor
 public enum AppGenerator {
     public static var installDirectory: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/Choosy Brave Containers")
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/Brave Destinations")
     }
 
-    public static func generate(configuration: DestinationConfiguration, receiver: URL, directory: URL) throws -> URL {
+    public static func readManagedApp(_ app: URL) throws -> DestinationConfiguration {
+        guard app.pathExtension.lowercased() == "app",
+              try app.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true,
+              let info = NSDictionary(contentsOf: app.appendingPathComponent("Contents/Info.plist")),
+              info["CBCManagedBundle"] as? Bool == true else {
+            throw AdapterError("Choose a destination app created by this utility, not a browser or another application.")
+        }
+        let config = try DestinationConfiguration.read(from: app.appendingPathComponent("Contents/Resources/destination.json"))
+        guard info["CFBundleIdentifier"] as? String == config.destination.bundleIdentifier else {
+            throw AdapterError("This app's destination and bundle identity do not match.")
+        }
+        return config
+    }
+
+    public static func installedApp(for destination: Destination) throws -> URL? {
+        let legacy = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/Choosy Brave Containers")
+        let matches = try [installDirectory, legacy].flatMap { try matchingApps(destination: destination, directory: $0) }
+        guard matches.count <= 1 else { throw AdapterError("Multiple installed apps target this destination. Use Edit installed app to select one.") }
+        return matches.first
+    }
+
+    public static func existingApp(for destination: Destination, directory: URL) throws -> URL? {
+        let matches = try matchingApps(destination: destination, directory: directory)
+        guard matches.count <= 1 else { throw AdapterError("Multiple apps target this destination in the selected folder.") }
+        return matches.first
+    }
+
+    private static func matchingApps(destination: Destination, directory: URL) throws -> [URL] {
+        guard FileManager.default.fileExists(atPath: directory.path) else { return [] }
+        return try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isSymbolicLinkKey])
+            .filter { app in (try? readManagedApp(app).destination) == destination }
+    }
+
+    public static func savedIcon(at app: URL) throws -> AppIcon {
+        _ = try readManagedApp(app)
+        let resources = app.appendingPathComponent("Contents/Resources")
+        if let data = try? Data(contentsOf: resources.appendingPathComponent("appearance.json")),
+           let saved = try? JSONDecoder().decode([String: String].self, from: data),
+           let raw = saved["iconPreset"], let preset = IconPreset(rawValue: raw) {
+            return .generated(preset)
+        }
+        return .custom(try Data(contentsOf: resources.appendingPathComponent("Destination.icns")))
+    }
+
+    public static func generate(configuration: DestinationConfiguration, receiver: URL, directory: URL,
+                                icon: AppIcon? = nil, rename: Bool = false) throws -> URL {
         let fm = FileManager.default
         guard !configuration.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              !configuration.displayName.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
-            throw AdapterError("App label must be nonempty and contain no control characters.")
+              !configuration.displayName.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
+              !configuration.displayName.contains("/"), !configuration.displayName.contains(":"),
+              !configuration.displayName.hasPrefix("."), configuration.displayName.utf8.count <= 240 else {
+            throw AdapterError("Use an app name up to 240 UTF-8 bytes, without /, :, control characters, or a leading dot.")
         }
         guard fm.isExecutableFile(atPath: receiver.path) else {
             throw AdapterError("ContainerReceiver is missing. Build both release executables or supply --receiver.")
@@ -29,26 +76,16 @@ public enum AppGenerator {
         defer { Darwin.close(lock) }
         guard flock(lock, LOCK_EX | LOCK_NB) == 0 else { throw AdapterError("Another generation is running in this directory.") }
         let id = configuration.destination.bundleIdentifier
-        let apps = try fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isSymbolicLinkKey])
-            .filter { $0.pathExtension == "app" }
-        let owned = apps.filter { app in
-            guard let saved = try? DestinationConfiguration.read(from: app.appendingPathComponent("Contents/Resources/destination.json")),
-                  saved.destination == configuration.destination,
-                  let info = NSDictionary(contentsOf: app.appendingPathComponent("Contents/Info.plist")),
-                  info["CBCManagedBundle"] as? Bool == true,
-                  info["CFBundleIdentifier"] as? String == id else { return false }
-            return true
-        }
+        let owned = try matchingApps(destination: configuration.destination, directory: directory)
         guard owned.count <= 1 else { throw AdapterError("Multiple apps for this destination exist in the output directory. Remove the duplicate first.") }
-        let name = configuration.displayName.unicodeScalars.map {
-            CharacterSet.alphanumerics.union(CharacterSet(charactersIn: " —-()._")).contains($0) ? String($0) : "_"
-        }.joined()
-        let target = owned.first ?? directory.appendingPathComponent("\(name.prefix(100)) [\(id.suffix(12))].app")
-        if fm.fileExists(atPath: target.path) {
-            guard owned.contains(target), try target.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else {
-                throw AdapterError("Refusing to overwrite an unrelated app or symbolic link.")
+        let target = !rename && owned.first != nil ? owned[0] : directory.appendingPathComponent(configuration.displayName + ".app")
+        if fm.fileExists(atPath: target.path) || (try? target.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true {
+            guard owned.contains(where: { BravePaths.canonical($0.path) == BravePaths.canonical(target.path) }), try target.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else {
+                throw AdapterError("An app or link already uses this filename. Choose another app name; existing apps were preserved.")
             }
         }
+        let selectedIcon = try icon ?? owned.first.map { try savedIcon(at: $0) } ?? .generated(.monogram)
+        let iconData = try DestinationIcons.data(for: selectedIcon, configuration: configuration)
         guard NSRunningApplication.runningApplications(withBundleIdentifier: id).isEmpty else {
             throw AdapterError("This destination receiver is running. Quit it in Activity Monitor, then repeat generation. Existing app was preserved.")
         }
@@ -72,8 +109,8 @@ public enum AppGenerator {
             "CFBundleExecutable": "ContainerReceiver",
             "CFBundlePackageType": "APPL",
             "CFBundleInfoDictionaryVersion": "6.0",
-            "CFBundleShortVersionString": "1.0.0",
-            "CFBundleVersion": "1",
+            "CFBundleShortVersionString": "1.3.0",
+            "CFBundleVersion": "6",
             "LSMinimumSystemVersion": "14.0",
             "LSUIElement": true,
             "NSHighResolutionCapable": true,
@@ -87,12 +124,28 @@ public enum AppGenerator {
         ]
         try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
             .write(to: staging.appendingPathComponent("Contents/Info.plist"))
-        try icon(configuration: configuration).write(to: resources.appendingPathComponent("Destination.icns"))
+        try iconData.write(to: resources.appendingPathComponent("Destination.icns"))
+        let preset: String
+        switch selectedIcon {
+        case .generated(let value): preset = value.rawValue
+        case .custom: preset = "custom"
+        }
+        try encoder.encode(["iconPreset": preset]).write(to: resources.appendingPathComponent("appearance.json"))
         try runTool("/usr/bin/codesign", ["--force", "--sign", "-", staging.path], failure: "Could not ad-hoc sign the app.")
         try runTool("/usr/bin/codesign", ["--verify", "--strict", staging.path], failure: "Generated app signature verification failed.")
-        let exists = fm.fileExists(atPath: target.path)
-        let flags = exists ? UInt32(RENAME_SWAP) : UInt32(RENAME_EXCL)
+        let previous = owned.first
+        let moving = previous.map { BravePaths.canonical($0.path) != BravePaths.canonical(target.path) } ?? false
+        if moving, let previous {
+            guard renameatx_np(AT_FDCWD, previous.path, AT_FDCWD, target.path, UInt32(RENAME_EXCL)) == 0 else {
+                throw AdapterError("Could not rename the app. Check for a filename collision or missing permissions; existing app was preserved.")
+            }
+        }
+        let flags = previous != nil ? UInt32(RENAME_SWAP) : UInt32(RENAME_EXCL)
         guard renameatx_np(AT_FDCWD, staging.path, AT_FDCWD, target.path, flags) == 0 else {
+            if moving, let previous,
+               renameatx_np(AT_FDCWD, target.path, AT_FDCWD, previous.path, UInt32(RENAME_EXCL)) != 0 {
+                throw AdapterError("Update failed. The original app is intact under the requested new filename; inspect it in Finder before retrying.")
+            }
             throw AdapterError("Could not atomically install the app. Existing apps were preserved.")
         }
         // On swap, staging now contains the old managed bundle and defer removes it.
@@ -115,44 +168,4 @@ public enum AppGenerator {
         guard process.terminationStatus == 0 else { throw AdapterError(failure) }
     }
 
-    private static func icon(configuration: DestinationConfiguration) throws -> Data {
-        var chunks = Data()
-        for (size, type) in [(128, "ic07"), (256, "ic08"), (512, "ic09"), (1024, "ic10")] {
-            guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size,
-                                                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
-                                                isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
-                  let context = NSGraphicsContext(bitmapImageRep: bitmap) else { throw AdapterError("Could not render the app icon.") }
-            NSGraphicsContext.saveGraphicsState()
-            NSGraphicsContext.current = context
-            let s = CGFloat(size)
-            let seed = configuration.destination.bundleIdentifier.suffix(6)
-            let hue = CGFloat(Int(seed, radix: 16) ?? 0) / CGFloat(0xffffff)
-            NSColor(calibratedHue: hue, saturation: 0.7, brightness: 0.8, alpha: 1).setFill()
-            NSBezierPath(roundedRect: NSRect(x: s * 0.08, y: s * 0.08, width: s * 0.84, height: s * 0.84),
-                         xRadius: s * 0.18, yRadius: s * 0.18).fill()
-            let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.boldSystemFont(ofSize: s * 0.42), .foregroundColor: NSColor.white]
-            let mark = "B" as NSString
-            let measured = mark.size(withAttributes: attributes)
-            mark.draw(at: NSPoint(x: (s - measured.width) / 2, y: s * 0.38), withAttributes: attributes)
-            let subtitle = String(configuration.displayName.replacingOccurrences(of: "Brave — ", with: "").prefix(3)).uppercased() as NSString
-            let small: [NSAttributedString.Key: Any] = [.font: NSFont.boldSystemFont(ofSize: s * 0.13), .foregroundColor: NSColor.white]
-            subtitle.draw(at: NSPoint(x: (s - subtitle.size(withAttributes: small).width) / 2, y: s * 0.22), withAttributes: small)
-            NSGraphicsContext.restoreGraphicsState()
-            guard let png = bitmap.representation(using: .png, properties: [:]) else { throw AdapterError("Could not encode the app icon.") }
-            chunks.append(Data(type.utf8))
-            chunks.append(bigEndian: UInt32(png.count + 8))
-            chunks.append(png)
-        }
-        var result = Data("icns".utf8)
-        result.append(bigEndian: UInt32(chunks.count + 8))
-        result.append(chunks)
-        return result
-    }
-}
-
-private extension Data {
-    mutating func append(bigEndian value: UInt32) {
-        var value = value.bigEndian
-        Swift.withUnsafeBytes(of: &value) { append(contentsOf: $0) }
-    }
 }

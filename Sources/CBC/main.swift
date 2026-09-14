@@ -22,7 +22,7 @@ private struct Options {
                 guard !temporary else { throw AdapterError("Repeated --temporary option.") }
                 temporary = true; index += 1; continue
             }
-            guard ["--brave", "--user-data-dir", "--profile", "--container-id", "--output", "--receiver", "--name", "--app"].contains(key),
+            guard ["--brave", "--user-data-dir", "--profile", "--container-id", "--output", "--receiver", "--name", "--app", "--icon", "--icon-file"].contains(key),
                   index + 1 < arguments.count, values[key] == nil else {
                 throw AdapterError("Unknown, repeated, or incomplete option. Run cbc help.")
             }
@@ -49,20 +49,54 @@ private func run() throws {
         cbc generate --profile DIRECTORY (--container-id ID | --temporary) --output DIRECTORY [options]
         cbc install (--all | --profile DIRECTORY (--container-id ID | --temporary)) [options]
 
+        cbc customize --app PATH [--name LABEL] [--icon PRESET | --icon-file IMAGE]
+
         Path options: --brave APP --user-data-dir DIRECTORY
-        Generation options: --receiver EXECUTABLE --name LABEL
+        Generation options: --receiver EXECUTABLE --name LABEL [--icon PRESET | --icon-file IMAGE]
+        Icon presets: monogram, work, personal, web, layers, temporary
         --all may be restricted with --profile. It installs enabled, saved configured containers.
         --temporary creates a fresh container per incoming URL batch; requires Brave 1.95.101+.
-        install uses ~/Applications/Choosy Brave Containers. Existing destinations keep their IDs.
+        install uses ~/Applications/Brave Destinations. Existing apps update in their current folder.
+        --name changes the app label and filename; no automatic hash suffix is added.
         No command changes Brave preferences or the default browser.
         """)
         return
     }
-    guard ["list", "doctor", "generate", "install"].contains(options.command) else {
+    guard ["list", "doctor", "generate", "install", "customize"].contains(options.command) else {
         throw AdapterError("Unknown command. Run cbc help.")
     }
     guard !options.temporary || (options.command != "list" && !options.all && options.values["--container-id"] == nil && options.values["--app"] == nil) else {
         throw AdapterError("--temporary requires doctor, generate, or install and cannot be combined with --all, --container-id, or --app.")
+    }
+    guard options.values["--icon"] == nil || options.values["--icon-file"] == nil else {
+        throw AdapterError("Choose --icon or --icon-file, not both.")
+    }
+    let icon: AppIcon?
+    if let preset = options.values["--icon"] {
+        guard let value = IconPreset(rawValue: preset) else { throw AdapterError("Unknown icon preset. Run cbc help.") }
+        icon = .generated(value)
+    } else if let file = options.values["--icon-file"] {
+        icon = try DestinationIcons.importImage(at: URL(fileURLWithPath: BravePaths.canonical(file)))
+    } else { icon = nil }
+    let receiver = options.values["--receiver"].map { URL(fileURLWithPath: BravePaths.canonical($0)) }
+        ?? URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL.resolvingSymlinksInPath().deletingLastPathComponent().appendingPathComponent("ContainerReceiver")
+    if options.command == "customize" {
+        guard let path = options.values["--app"], !options.all,
+              Set(options.values.keys).isSubset(of: ["--app", "--name", "--icon", "--icon-file", "--receiver"]),
+              options.values["--name"] != nil || icon != nil else {
+            throw AdapterError("customize requires --app PATH and --name, --icon, or --icon-file.")
+        }
+        let app = URL(fileURLWithPath: path).standardizedFileURL
+        let saved = try AppGenerator.readManagedApp(app)
+        let config = DestinationConfiguration(destination: saved.destination, displayName: options.values["--name"] ?? saved.displayName)
+        let updated = try AppGenerator.generate(configuration: config, receiver: receiver,
+            directory: app.deletingLastPathComponent(), icon: icon, rename: options.values["--name"] != nil)
+        try AppGenerator.register(updated)
+        print(updated.path)
+        return
+    }
+    guard icon == nil || ["install", "generate"].contains(options.command) else {
+        throw AdapterError("Icon options require install, generate, or customize.")
     }
     var paths = options.paths
     var selected: Destination?
@@ -140,8 +174,6 @@ private func run() throws {
         guard let directory = options.values["--output"] else { throw AdapterError("generate requires --output DIRECTORY.") }
         output = URL(fileURLWithPath: BravePaths.canonical(directory))
     }
-    let receiver = options.values["--receiver"].map { URL(fileURLWithPath: BravePaths.canonical($0)) }
-        ?? URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL.resolvingSymlinksInPath().deletingLastPathComponent().appendingPathComponent("ContainerReceiver")
     var destinations: [ResolvedDestination] = []
     if options.all {
         for profile in profiles {
@@ -161,8 +193,14 @@ private func run() throws {
     }
     guard !destinations.isEmpty else { throw AdapterError("No enabled, saved container destinations were found. Configure containers in Brave's UI, then run list.") }
     for resolved in destinations {
-        let configuration = DestinationConfiguration(destination: resolved.destination, displayName: options.values["--name"] ?? resolved.displayName)
-        let app = try AppGenerator.generate(configuration: configuration, receiver: receiver, directory: output)
+        let existing = try options.command == "install"
+            ? AppGenerator.installedApp(for: resolved.destination)
+            : AppGenerator.existingApp(for: resolved.destination, directory: output)
+        let saved = try existing.map { try AppGenerator.readManagedApp($0) }
+        let configuration = DestinationConfiguration(destination: resolved.destination,
+            displayName: options.values["--name"] ?? saved?.displayName ?? resolved.displayName)
+        let app = try AppGenerator.generate(configuration: configuration, receiver: receiver,
+            directory: existing?.deletingLastPathComponent() ?? output, icon: icon, rename: options.values["--name"] != nil)
         if options.command == "install" { try AppGenerator.register(app) }
         print(app.path)
     }
