@@ -15,6 +15,14 @@ cp "$build_dir/ContainerReceiver" "$app/Contents/Resources/ContainerReceiver"
 strip -S "$app/Contents/MacOS/ContainerSetup"
 strip -S "$app/Contents/Resources/ContainerReceiver"
 cp README.md "$app/Contents/Resources/README.md"
+iconset="$stage/SetupIcon.iconset"
+mkdir -p "$iconset"
+for size in 16 32 128 256 512; do
+  sips -z "$size" "$size" assets/SetupIcon.png --out "$iconset/icon_${size}x${size}.png" >/dev/null
+  pixels=$((size * 2))
+  sips -z "$pixels" "$pixels" assets/SetupIcon.png --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
+done
+iconutil -c icns "$iconset" -o "$app/Contents/Resources/SetupIcon.icns"
 cat > "$app/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -23,9 +31,10 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
 <key>CFBundleName</key><string>Brave Container Setup</string>
 <key>CFBundleDisplayName</key><string>Brave Container Setup</string>
 <key>CFBundleExecutable</key><string>ContainerSetup</string>
+<key>CFBundleIconFile</key><string>SetupIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>1.1.1</string>
-<key>CFBundleVersion</key><string>3</string>
+<key>CFBundleShortVersionString</key><string>1.1.2</string>
+<key>CFBundleVersion</key><string>4</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
