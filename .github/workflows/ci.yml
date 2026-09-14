@@ -25,6 +25,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, Node 24
         with:
           persist-credentials: false
+      - name: Select Swift 6 on macOS 14
+        if: matrix.runner == 'macos-14'
+        run: echo "DEVELOPER_DIR=/Applications/Xcode_16.2.app/Contents/Developer" >> "$GITHUB_ENV"
       - name: Check repository
         run: scripts/check-repo.py
       - name: Test

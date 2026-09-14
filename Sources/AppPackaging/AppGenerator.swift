@@ -94,6 +94,9 @@ public enum AppGenerator {
             throw AdapterError("The destination directory lock is not a regular file.")
         }
         guard flock(lock, LOCK_EX | LOCK_NB) == 0 else { throw AdapterError("Another generation is running in this directory.") }
+        // A concurrently spawning child can briefly inherit the open description.
+        // Explicit unlock releases ownership even before that child reaches exec.
+        defer { _ = flock(lock, LOCK_UN) }
         let id = configuration.destination.bundleIdentifier
         let owned = try matchingApps(destination: configuration.destination, directory: directory)
         guard owned.count <= 1 else { throw AdapterError("Multiple apps for this destination exist in the output directory. Remove the duplicate first.") }
