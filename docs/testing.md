@@ -42,8 +42,12 @@ The host was Apple silicon on macOS 26.6.2 with Swift 6.3.3.
 | Developer ID distribution | Older ZIP signatures/tickets and fresh CLI downloads passed |
 | Unmodified vendor Brave, final profile/container GUI assertion | Passed with 1.95.101 for the 1.4.0 candidate |
 | Third-party switcher to generated app to Brave | Choosy 2.5.2, cold and running, passed |
-| Second Mac and normal browser-download first-open flow | Still required |
-| Intel and macOS 14 runtime | CI covers synthetic adapter behavior; browser GUI still required |
+| Second Mac | Owner confirmed it works on 2026-09-14; hardware, versions and individual download/open steps were not recorded |
+| Intel and macOS 14 runtime | CI covers synthetic adapter behavior; browser GUI remains untested |
+
+The second-Mac result is an owner report, not an independently observed run of the
+full matrix below. Full VoiceOver and keyboard-only navigation remain untested.
+These coverage limits do not block the initial public release.
 
 Earlier GUI automation selected the personal instance when bundle IDs matched. Routing
 checks therefore used a copied Brave installation with a distinct bundle ID and

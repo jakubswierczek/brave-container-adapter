@@ -20,7 +20,7 @@ Generate destination apps on each Mac. They contain local paths and configuratio
 - macOS 14+. The DMG includes Apple silicon and Intel binaries. No Xcode is needed to run it.
 - Brave Containers: named routing requires 1.92.140+; temporary routing requires 1.95.101+.
 - Tested on Apple silicon, macOS 26.6.2, with Brave 1.92.140 and 1.95.101. CI covers adapter logic on macOS 14/15 and Intel macOS 15; browser GUI checks on those systems remain open.
-- Choosy 2.5.2 handoff passed with unmodified Brave 1.95.101, cold and running. Other switchers and the second-Mac download flow need verification. See the [test record](docs/testing.md).
+- Choosy 2.5.2 handoff passed with unmodified Brave 1.95.101, cold and running. The owner also confirmed operation on a second Mac. Intel browser GUI and full VoiceOver checks remain untested. See the [test record](docs/testing.md).
 
 Discovery reads Brave's internal preference format. Named routing resolves a saved container ID to its current name before invoking Brave directly. A rename/delete race between saved preferences and Brave's in-memory state can still cause incorrect routing. **This adapter is not an isolation security boundary.** Check the container badge before sensitive browsing.
 
@@ -35,7 +35,9 @@ Only links sent to a generated app pass through the adapter. Normal navigation i
 - [Testing](docs/testing.md): automated coverage and manual verification.
 - [Signing and releases](docs/signing.md): Developer ID, notarization and release checks.
 - [Public-readiness audit](docs/public-readiness.md): findings and the publication checklist.
-- [Maintenance](docs/maintenance.md), [contributing](CONTRIBUTING.md) and [security reporting](SECURITY.md).
+- [Maintenance](docs/maintenance.md), [contribution policy](CONTRIBUTING.md) and [security reporting](SECURITY.md).
+
+Issues and pull requests are disabled. Security vulnerabilities can be reported privately through the [security policy](SECURITY.md).
 
 ## Build from source
 

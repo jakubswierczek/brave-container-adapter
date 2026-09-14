@@ -58,10 +58,15 @@ cover it separately. The UI tool returned stale settings-menu trees after Brave
 saved container edits; restarting only the disposable instance restored inspection.
 No final-tab check was inferred from process exit status or from stale UI output.
 
-## Still required
+## Owner-reported second-Mac result
 
-- Second Mac: browser-download quarantine, normal first open, generation and switcher
-  handoff. The owner agreed to perform this check; no result has been supplied yet.
+On 2026-09-14, the owner confirmed that the app works on a second Mac. Hardware,
+OS/browser/switcher versions and individual download/quarantine steps were not
+recorded. This is owner-confirmed operation, not an independently observed repeat
+of the full integration matrix.
+
+## Remaining coverage
+
 - Actual browser handoff on Intel and minimum macOS. CI verifies adapter runtime logic
   there, not browser UI.
 - Full VoiceOver and keyboard-only navigation pass. Standard editing shortcuts and
@@ -88,8 +93,10 @@ A fresh GitHub CLI download matched the checksum and passed signature, staple, i
 
 DMG SHA-256: `49420c75916e16f6a1085f7eaaec34acc2b961a5b3dda8e5bb655ec07eee0413`.
 
-`main` now requires pull requests, resolved conversations and the strict `checks`
-status. Admins are included; force pushes and branch deletion are disabled. A sole
-maintainer needs no second approval. Active version-tag rules prevent movement and
-deletion. These settings were read back from GitHub; they are not merely a proposed
-policy. Signing credentials remain local. Repository visibility remains private.
+At release preparation, `main` required pull requests and the strict `checks`
+status. On publication, the owner requested issues and pull requests be disabled.
+Both features are now disabled; the PR requirement was removed so the maintainer
+can fast-forward CI-verified commits. Required `checks`, admin enforcement, force-push
+and deletion protection remain. Active version-tag rules prevent movement and deletion.
+Signing credentials remain local. The repository is public, with private vulnerability
+reporting, secret scanning and push protection enabled.

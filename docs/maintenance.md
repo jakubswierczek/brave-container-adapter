@@ -24,10 +24,12 @@ See the [runner retirement notice](https://github.com/actions/runner-images/issu
 
 ## Change and release controls
 
-Use pull requests after branch protection is enabled. Require the aggregate
-`checks` status on the current merge base. A sole maintainer may merge without
-another approval; passing CI is still required. Block force pushes and branch
-deletion. Version tags should permit creation but block movement and deletion.
+Issues and pull requests are disabled at the owner's request. Maintainer changes
+use a work branch: push it, run `gh workflow run ci.yml --ref BRANCH`, and wait for
+the aggregate `checks` status on that exact commit. Fast-forward `main` only after
+CI passes and the branch includes current `main`. Required CI also applies to
+admins; do not bypass it. Force pushes and branch deletion remain blocked. Version
+tags permit creation but block movement and deletion.
 
 Keep Actions read-only and pin external actions by full commit SHA. Do not add
 signing credentials to CI or use `pull_request_target` to run contribution code.

@@ -5,15 +5,15 @@ settings, CI, packaging and local integration. This is a maintainer review, not 
 independent penetration test or legal clearance. The initial findings remain in
 [Git history](https://github.com/jakubswierczek/brave-container-adapter/blob/f98b889a52c69875664ea0295a39110de13dfcdd/docs/public-readiness.md).
 
-**Keep private until the remaining publication steps below are complete.** The
-engineering findings have fixes and regression coverage. External verification and
-public-account settings must not be reported as complete without evidence.
+**Published with owner authorization on 2026-09-14.** Engineering findings have
+fixes and regression coverage. The owner confirmed operation on a second Mac.
+Intel browser GUI and full VoiceOver checks remain untested.
 
 ## Remediation
 
 | Finding | Change and evidence |
 | --- | --- |
-| Repository controls | `main` requires a pull request, resolved conversations and the strict `checks` status, including for admins. Force pushes/deletion are blocked. Active version-tag rules block updates/deletion while allowing new tags. |
+| Repository controls | Issues and pull requests are disabled at the owner's request. `main` retains strict required `checks`, including for admins. Maintainer updates use CI-verified fast-forward pushes. Force pushes/deletion are blocked. Active version-tag rules block updates/deletion while allowing new tags. |
 | Missing license | Owner confirmed publication rights, including employer-related rights. [MIT](../LICENSE) covers code, documentation and project-owned artwork; contribution and asset terms updated. |
 | Unbounded receiver queue | Maximum 32 pending batches/1 MiB; each batch accepts 128 URLs/128 KiB, with 64 KiB per URL. Rejects the newest batch atomically; preserves accepted duplicates and FIFO. Unit tests and a real event during an alert passed. |
 | Blocking signing/registration | Async native helpers, 15-second timeout and cancellation. Setup stays available to cancel. Tests verify timeout, cancellation and preservation of unrelated processes/apps. |
@@ -28,15 +28,15 @@ public-account settings must not be reported as complete without evidence.
 | Artwork | Removed SF Symbols from generated icons in 1.3.1. Letter tiles and the recorded AI-generated setup artwork remain. MIT excludes third-party marks and user imports. |
 | Maintenance | Named maintainer, latest-release policy, Brave compatibility procedure, CI runner retirement and release controls in [maintenance](maintenance.md). |
 
-## Remaining publication steps
+## Publication record
 
 | Step | Current state |
 | --- | --- |
-| Public publisher identity | The existing Developer ID leaf certificate was inspected: no email address or email subject/SAN field. Signatures expose the publisher name and Team ID. The owner asked for advice; recommendation is to retain this personal identity. Final public disclosure remains part of publication approval. |
-| Second-Mac distribution | Owner agreed to test. Still needs a normal browser download, first open, generated app and actual switcher handoff. No result is claimed. |
-| Private vulnerability reporting | GitHub's endpoint is unavailable while this repo is private. Enable and verify the reporting form immediately when publication is authorized. Until then, [SECURITY.md](../SECURITY.md) states the private-access contact procedure. |
-| Public security settings | Verify secret scanning and push protection availability after the visibility change. No null/unavailable API field counts as enabled. |
-| Visibility change | Not authorized by this remediation request. Repo stays private until explicit owner approval. |
+| Public publisher identity | The Developer ID leaf certificate contains no email address or email subject/SAN field. Signatures expose the publisher name and Team ID. The owner authorized publication after this disclosure was explained. |
+| Second Mac | Owner confirmed it works. Hardware, versions and individual download/quarantine steps were not recorded; no independent full-matrix result is claimed. |
+| Private vulnerability reporting | Enabled after publication; [SECURITY.md](../SECURITY.md) links the private reporting form. Issues and pull requests remain disabled. |
+| Public security settings | Secret scanning and push protection are enabled, confirmed by API readback. |
+| Visibility change | Owner explicitly authorized publication on 2026-09-14. GitHub reports `public`. |
 
 Full VoiceOver testing and browser GUI checks on Intel/minimum macOS are additional
 compatibility work. Public wording must retain those limits. CI coverage is evidence
@@ -44,18 +44,25 @@ of adapter runtime logic on those systems, not evidence of all browser behavior.
 
 ## Privacy and repository surfaces
 
-The final pre-release scan covered 19 remote commits and 138 unique blobs through
-`a6e486737ac887d66acf3c6a79e8d0f4d00e88a8`: Gitleaks and targeted private-path/key/mail
-checks reported zero findings. The positive control was rerun successfully. The
+The publication scan covered 21 remote commits and 140 unique blobs through
+`815b25ba7ff4147190de4c72fa2ea5d58849e1ab`, including the earlier documentation PR head:
+Gitleaks and targeted private-path/key/mail checks reported zero findings. The latest
+main CI logs also passed Gitleaks. The scanner positive control had passed during
+release preparation. The
 exact v1.4.0 DMG payload also passed both scans, and its clean-source build manifest
 and MIT license were checked. Signatures intentionally retain publisher identity.
 
-Live GitHub inventory at release preparation: private repository, one collaborator
+GitHub inventory at release preparation: private repository, one collaborator
 (the owner), no issues/PRs yet, no Actions artifacts, secrets, variables, environments,
 webhooks or deploy keys, no Pages, discussions or forks. The unused wiki was disabled.
 REST package details required a missing scope, but the permitted GraphQL
 `repository.packages.totalCount` query returned **0**. No token scope was widened.
 The later documentation pull request contains only public-safe release evidence.
+
+Before publication, the inventory again showed one collaborator and no Actions
+artifacts, secrets, variables, environments, webhooks, deploy keys or packages.
+Disabling pull requests hides the earlier merged documentation PR; it does not
+erase its history. No history was rewritten.
 
 
 The initial audit scanned a fresh remote bare clone and all five then-published ZIP
@@ -69,8 +76,8 @@ The five old ZIP releases were removed at the owner's request. Source tags remai
 for traceability. v1.3.1 introduced the signed DMG; withdrawn binaries containing
 SF Symbols must not be republished. The current [v1.4.0 DMG](https://github.com/jakubswierczek/brave-container-adapter/releases/tag/v1.4.0) passed Developer ID, Apple notarization, staple, Gatekeeper, mount/copy and local first-launch checks. See [verification](verification-1.4.0.md) and the [signing guide](signing.md).
 
-Before publication, re-scan the final remote refs and exact DMG, and inspect Actions
-logs/artifacts, issues, pull requests, wiki, packages, releases, collaborators,
+For future releases, scan final remote refs and the exact DMG, and inspect Actions
+logs/artifacts, repository features, packages, releases, collaborators,
 secrets/variables, environments, webhooks and deploy keys. Scan reports, signing
 credentials, real browser data and generated destination configuration stay outside
 Git. `.gitignore` is not secret protection. Do not mirror local checkpoint refs.

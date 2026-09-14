@@ -2,14 +2,12 @@
 
 ## Report a vulnerability
 
-Do not put exploit details, private URLs, browser data or credentials in an issue.
-While this repository is private, use the private channel through which you were
-given access to contact the maintainer. If you have no such channel, open an issue
-asking for a private contact without disclosing the vulnerability.
+Use GitHub's private [Report a vulnerability](https://github.com/jakubswierczek/brave-container-adapter/security/advisories/new)
+form. Sign in to GitHub to submit a report. Private vulnerability reporting is
+enabled; issues and pull requests are disabled.
 
-Before public launch, the maintainer must enable GitHub private vulnerability
-reporting and verify its **Report a vulnerability** form. That channel is not
-claimed to be available yet. See the [publication checklist](docs/public-readiness.md).
+Do not publish exploit details, private URLs, browser data or credentials.
+The private form is for security vulnerabilities, not general support requests.
 
 Include affected versions, impact, a minimal synthetic reproduction and suggested
 fix if available. No response-time or bounty commitment is currently offered.
