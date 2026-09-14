@@ -223,3 +223,24 @@ personal profiles were preserved. Third-party switcher cache behavior, another
 Mac, Intel runtime, and browser-download quarantine remain manual checks. After
 renaming an app, remove and re-add its switcher entry if the old name, icon, or
 path remains cached.
+
+
+### Appearance release signing and distribution
+
+Version **1.3.0/build 6** was built from
+`d4036ff304d33e5a2abcebbd57c88a3b5718a983`. Submission
+`d1526081-a65e-4fb8-860b-4182522e953f` returned `Accepted`; Apple's report says
+`Ready for distribution` with no issues. Both executables use Developer ID
+signatures, secure timestamps, and Hardened Runtime. The setup icon is included.
+
+The final ZIP passed the browser-data/private-path scan, arm64/x86_64 checks,
+strict signatures, ticket validation, and Gatekeeper assessment as
+`Notarized Developer ID`. The extracted signed app opened outside the checkout
+and displayed the destination editor. The ZIP and checksum are published in
+[v1.3.0](https://github.com/jakubswierczek/choosy-brave-containers/releases/tag/v1.3.0).
+
+A fresh GitHub CLI download reproduced the checksum, signature, ticket, and
+Gatekeeper results, and verified the version and setup icon declaration.
+ZIP SHA-256: `b08455006ec219f60f2aedf33077731e5e6401c72fb14401ce887668f8b5e73b`.
+Browser-download quarantine, another Mac, Intel runtime, and third-party
+switcher interaction remain manual checks.
