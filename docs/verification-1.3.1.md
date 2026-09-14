@@ -18,6 +18,8 @@ Release source: `be47ad0f47b236e7d2f05188126d5ddc7a400d66`.
 - [Hosted macOS CI](https://github.com/jakubswierczek/brave-container-adapter/actions/runs/34850698611)
   passed repository checks, all 40 tests, release build and universal DMG packaging.
   Runner: `macos-15-arm64`, image `20260907.0337.1`, macOS SDK 15.5 for packaging.
+- The CI checkout action is now pinned to v7.0.1, which uses Node 24. The initial
+  source-release run used v4 and reported its Node 20 deprecation warning.
 
 ## Distribution checks
 
