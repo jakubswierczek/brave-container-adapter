@@ -12,6 +12,6 @@ Run that script to build an app containing the icon; extract the ZIP in `dist/`
 to inspect the packaged resource. Destination apps retain their individual
 generated labels and icons.
 
-The artwork is included in local 1.1.2 packages. The existing 1.1.1 notarization
-submission is unchanged. A release that includes the icon needs its own signing
-and notarization pass.
+The artwork is included in the signed and notarized
+[v1.1.2 release](https://github.com/jakubswierczek/choosy-brave-containers/releases/tag/v1.1.2).
+It received a separate notarization approval; the v1.1.1 artifact is unchanged.

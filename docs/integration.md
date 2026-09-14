@@ -70,4 +70,25 @@ The published assets were downloaded again with the GitHub CLI. The checksum,
 attached ticket, both signatures, and Gatekeeper assessment passed. A CLI
 download does not reproduce a browser download's first-open quarantine flow.
 
-The new setup icon is prepared in v1.1.2 source and local packages. That build has not been submitted for notarization. The v1.1.1 approval applies to the original artifact. First opening a downloaded app on another Mac, Choosy delivery, and Intel runtime remain manual checks.
+## Icon release v1.1.2, 2026-09-14
+
+The setup icon was included in a new universal build from
+`2fc88128590e48a72c6e7774286c1210a14454af`. Submission
+`97a1c889-9a66-48de-a0fc-b7b361f0a2fc` was created at
+`2026-09-14T10:52:27Z`; the wait command returned `Accepted` about 19 seconds
+later. Apple's report contains no issues. This timing does not guarantee faster
+processing for future releases.
+
+The final ZIP passed ticket validation, strict signatures for both executables,
+Gatekeeper acceptance as `Notarized Developer ID`, and the browser-data/private-
+path archive scan. Both executables contain arm64 and x86_64 slices. Version
+1.1.2/build 4 declares `SetupIcon`; the packaged icon decodes into ten standard
+and Retina RGBA representations. The artwork was inspected at 32 and 128 pixels.
+Routing code is unchanged from the v1.1.1 test run.
+
+The ZIP and checksum are published in
+[v1.1.2](https://github.com/jakubswierczek/choosy-brave-containers/releases/tag/v1.1.2).
+Downloading those assets with the GitHub CLI reproduced the checksum, ticket,
+signature, and Gatekeeper results, and confirmed the icon declaration and version.
+First opening a downloaded app on another Mac, Choosy delivery, and Intel runtime
+remain manual checks.
