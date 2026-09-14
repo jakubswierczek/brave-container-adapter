@@ -22,10 +22,10 @@ licensing, public reporting, or the missing end-to-end compatibility checks.
   and custom icons remain supported.
 - Centralized release version/build number. Added a DMG packaging/signing workflow
   with the plain filename `Brave-Container-Adapter.dmg`.
-- Prepared replacement of the five ZIP releases at the owner's request. Old source
+- Replaced the five ZIP releases with the verified v1.3.1 DMG at the owner's request. Old source
   tags remain; deleting releases is not deleting their Git history.
 
-Release execution and CI results are recorded separately in [verification](verification-1.3.1.md).
+Release execution and passing CI results are recorded separately in [verification](verification-1.3.1.md).
 
 ## Publication gates
 
@@ -72,6 +72,9 @@ All five existing ZIP releases were downloaded; their published checksums matche
 Targeted payload scans found no private-path/key/email matches or browser configuration
 filenames. This does not prove that arbitrary binary data, unrecognized secrets or
 all forms of personal information are absent. Scanner reports stay outside Git.
+Gitleaks also found no secrets in the working source or five extracted ZIP payloads.
+After the cleanup commit was pushed, the fresh remote clone was fetched again;
+the 14 reachable commits passed the same history scan.
 
 Initial GitHub API inventory:
 

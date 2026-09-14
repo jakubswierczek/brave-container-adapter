@@ -66,7 +66,7 @@ The signed setup app launched from a copy outside the checkout. Process inspecti
 
 Notarization submission `931511ca-ffa1-4763-98d2-854823150a5e`, created at `2026-09-14T08:55:55Z`, was observed as `Accepted` about 57 minutes after submission. Apple's log reports `Ready for distribution` with no issues. The original script stopped waiting after 30 minutes; processing continued at Apple. The existing signed app was used to finish the same submission without rebuilding or re-signing.
 
-Apple's ticket was attached and validated. Strict signature verification passed for the app and embedded receiver. Gatekeeper accepted the app as `Notarized Developer ID`. A fresh extraction of the final ZIP passed the same ticket and signature checks, verified version 1.1.1, and passed the browser-data/private-path archive scan. The notarized ZIP and SHA-256 file are published in [v1.1.1](https://github.com/jakubswierczek/brave-container-adapter/tree/v1.1.1), built from `cd0ee22ba8b3e379d82a956972401309f89373b8`.
+Apple's ticket was attached and validated. Strict signature verification passed for the app and embedded receiver. Gatekeeper accepted the app as `Notarized Developer ID`. A fresh extraction of the final ZIP passed the same ticket and signature checks, verified version 1.1.1, and passed the browser-data/private-path archive scan. The notarized ZIP and SHA-256 file were published in [v1.1.1](https://github.com/jakubswierczek/brave-container-adapter/tree/v1.1.1), built from `cd0ee22ba8b3e379d82a956972401309f89373b8`.
 
 The published assets were downloaded again with the GitHub CLI. The checksum,
 attached ticket, both signatures, and Gatekeeper assessment passed. A CLI
@@ -88,7 +88,7 @@ path archive scan. Both executables contain arm64 and x86_64 slices. Version
 and Retina RGBA representations. The artwork was inspected at 32 and 128 pixels.
 Routing code is unchanged from the v1.1.1 test run.
 
-The ZIP and checksum are published in
+The ZIP and checksum were published in
 [v1.1.2](https://github.com/jakubswierczek/brave-container-adapter/tree/v1.1.2).
 Downloading those assets with the GitHub CLI reproduced the checksum, ticket,
 signature, and Gatekeeper results, and confirmed the icon declaration and version.
@@ -165,7 +165,7 @@ Developer ID, secure timestamps, and Hardened Runtime.
 The final ZIP passed the browser-data/private-path scan, both architecture
 checks, strict signatures, ticket validation, and Gatekeeper assessment as
 `Notarized Developer ID`. The extracted signed setup app also opened outside the
-checkout and displayed its native window. The ZIP and checksum are published in
+checkout and displayed its native window. The ZIP and checksum were published in
 [v1.2.0](https://github.com/jakubswierczek/brave-container-adapter/tree/v1.2.0).
 
 A fresh GitHub CLI download reproduced the checksum, signatures, ticket, and
@@ -238,7 +238,7 @@ signatures, secure timestamps, and Hardened Runtime. The setup icon is included.
 The final ZIP passed the browser-data/private-path scan, arm64/x86_64 checks,
 strict signatures, ticket validation, and Gatekeeper assessment as
 `Notarized Developer ID`. The extracted signed app opened outside the checkout
-and displayed the destination editor. The ZIP and checksum are published in
+and displayed the destination editor. The ZIP and checksum were published in
 [v1.3.0](https://github.com/jakubswierczek/brave-container-adapter/tree/v1.3.0).
 
 A fresh GitHub CLI download reproduced the checksum, signature, ticket, and
