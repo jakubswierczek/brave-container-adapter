@@ -274,7 +274,7 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
                 _ = try Discovery(paths: destination.paths).resolve(destination)
             }
             guard let receiver = Bundle.main.resourceURL?.appendingPathComponent("ContainerReceiver") else {
-                throw AdapterError("Setup resources are missing. Extract the complete setup app from its ZIP again.")
+                throw AdapterError("Setup resources are missing. Reinstall the complete setup app from its disk image.")
             }
             let configuration = DestinationConfiguration(destination: destination,
                 displayName: appName.stringValue.trimmingCharacters(in: .whitespacesAndNewlines))

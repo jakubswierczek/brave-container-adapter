@@ -1,6 +1,8 @@
-# Developer ID signing
+# Signing and releases
 
-Releases v1.1.1 through v1.3.0 are Developer ID signed and notarized. The older v1.1.0 ZIP is ad-hoc signed. Developer ID releases use the `-notarized.zip` filename. An individual or company Apple Developer Program membership can provide Developer ID signing, but membership alone does not install a certificate or grant certificate creation rights.
+Release downloads use `Brave-Container-Adapter.dmg` and its `.sha256` file. The setup
+app and DMG are Developer ID signed and notarized. Local package builds and locally
+generated destination apps are ad-hoc signed. Filenames do not describe signing state.
 
 Apple lists **Account Holder** as the role required to create a Developer ID certificate. Some admins have access to cloud-managed certificates. This script needs a **local Developer ID Application certificate and its private key**; an Apple Development certificate or cloud-only identity does not satisfy it. See [Apple's certificate instructions](https://developer.apple.com/help/account/certificates/create-developer-id-certificates).
 
@@ -25,41 +27,86 @@ Apple lists **Account Holder** as the role required to create a Developer ID cer
 
 ## Build and notarize
 
-From the checkout on the signing Mac:
+Run checks from a clean source commit first. The release version and build number
+come from `Sources/BraveDestinations/ReleaseVersion.swift`.
 
 ```bash
+scripts/check-repo.py
+scripts/test.sh
+scripts/build.sh
 scripts/notarize-setup.sh YOUR_40_CHARACTER_CERTIFICATE_HASH cbc-notary
 ```
 
-The script verifies the identity and saved credentials before building. It signs the embedded receiver and then the setup app with Hardened Runtime and secure timestamps. It submits the ZIP to Apple, requires an `Accepted` result, staples and validates the ticket, and requires a successful Gatekeeper assessment before making the distribution ZIP. These steps follow [Apple's notarization requirements](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
+The signing script verifies the local identity and saved credentials, builds both
+architectures, and signs the receiver then Setup with Hardened Runtime and secure
+timestamps. It submits an internal ZIP, waits for acceptance, and staples the app.
+It then creates and signs the DMG, submits that image, and staples its ticket.
+The two submissions let both the mounted disk and the copied app carry tickets.
+No ZIP is published. See [Apple's notarization workflow](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
 
-Each attempt stays in an ignored `dist/notarization.XXXXXX/` directory. A successful attempt contains `Brave-Container-Setup-notarized.zip` and its SHA-256 file. Failed or timed-out attempts retain `result.json` and the submitted app for diagnosis. A timeout does not cancel Apple's processing. Use the submission ID with `xcrun notarytool info` or `log` and the same Keychain profile before deciding to resubmit. The script does not publish releases or overwrite a previous attempt.
+Each attempt stays in ignored `dist/notarization.XXXXXX/`. It contains separate
+`app-submission.json`, `app-result.json`, `app-log.json` and corresponding `dmg-*`
+records. The script checks signatures, both architectures, ticket validity, image
+integrity and Gatekeeper. Only a completed attempt gets its final DMG checksum.
+It never publishes to GitHub.
 
-After success, test the ZIP downloaded onto another Mac and publish that exact ZIP/checksum. Confirm that setup opens and can install a destination, then check browser-switcher routing. A local Gatekeeper assessment alone does not prove a clean download works.
+## Monitor or resume
 
-## Check submission status
-
-On the Mac where the Keychain profile is saved, replace `SUBMISSION_ID` with the
-ID printed when the upload completes:
+Each submission ID is printed after upload and saved before waiting. On the signing Mac:
 
 ```bash
 xcrun notarytool info SUBMISSION_ID --keychain-profile cbc-notary
+xcrun notarytool wait SUBMISSION_ID --keychain-profile cbc-notary --timeout 1h
+xcrun notarytool log SUBMISSION_ID --keychain-profile cbc-notary report.json
 ```
 
-To keep polling in Terminal until completion or a one-hour timeout:
+`In Progress` gives no completion estimate. A wait timeout does not cancel Apple's
+processing. Inspect the existing submission before uploading again. Failed or
+incomplete attempts must not be distributed.
+
+If the app submission later becomes accepted, staple and validate that same app,
+create the DMG with `scripts/create-dmg.sh`, sign it, and submit the DMG. If only the
+DMG wait timed out, continue with that same DMG after acceptance; do not rebuild.
+These manual completion steps use the same commands as `scripts/notarize-setup.sh`.
+
+## Validate the distribution
+
+Replace the example path with the successful attempt directory:
 
 ```bash
-xcrun notarytool wait SUBMISSION_ID --keychain-profile cbc-notary --timeout 1h
+cd dist/notarization.XXXXXX
+shasum -a 256 -c Brave-Container-Adapter.dmg.sha256
+hdiutil verify Brave-Container-Adapter.dmg
+codesign --verify --strict Brave-Container-Adapter.dmg
+xcrun stapler validate Brave-Container-Adapter.dmg
+spctl --assess --type open --context context:primary-signature --verbose=2 Brave-Container-Adapter.dmg
 ```
 
-`In Progress` means Apple is still processing. `Accepted` means notarization
-succeeded; attach the ticket and verify the distribution before publishing.
-For a failed result, retrieve the report with `notarytool log`. Stopping the
-monitor or reaching its timeout does not cancel the submission or submit a new
-copy. These commands report status rather than a completion estimate.
+Mount read-only. Confirm it contains Setup, the Applications shortcut and `Read Me.txt`.
+Copy Setup outside the disk image. Verify its signature and ticket, both executable
+architectures, then assess it with `spctl --assess --type execute --verbose=2`.
+Open that copy, inspect icons and install a destination using disposable data.
 
-## Scope and verification
+Scan the DMG payload for real destination configuration, browser data, private paths,
+credentials and unintended files. Embedded documentation must contain only public-safe
+examples. A Developer ID signature exposes its publisher name and Team ID by design.
 
-Signing covers the portable setup app and its embedded receiver. Generated destination apps have local configuration and new bundle identities; the generator ad-hoc signs those apps on the destination Mac. They do not inherit the setup app's notarization ticket. The signing private key is never embedded in the setup or destination apps.
+## Publish
 
-Local verification on 2026-09-13 covered script syntax, argument validation, and rejection of a missing identity before building or uploading. On 2026-09-14, a valid individual Developer ID identity signed v1.1.1's setup app and receiver; both signatures, secure timestamps, and Hardened Runtime flags were verified. All 24 tests passed, and the setup GUI still installed an isolated test destination. See [the integration record](integration.md) for notarization and distribution status.
+Create a release from the verified source commit. Upload only the final DMG and
+checksum. Keep credentials and notarization records local. Use a body file for release
+notes and include exact checks, supported versions and remaining manual checks.
+Download the uploaded assets again; verify checksum, signatures, tickets, image
+contents and Gatekeeper. A GitHub CLI download does not simulate a browser's quarantine
+first-open flow. Complete the [second-Mac matrix](testing.md) before claiming that proof.
+
+Do not remove old releases, move tags or rewrite history without explicit authorization.
+The v1.3.1 cleanup replaces the five earlier ZIP releases at the owner's request;
+source tags remain for traceability. Changing the repository name does not change
+existing app bundle identities.
+
+## Signing scope
+
+Destination apps contain new local configuration and bundle identities. The generator
+ad-hoc signs them on the destination Mac. They do not inherit Setup's ticket, and no
+signing private key is embedded in either app. Create destinations on each target Mac.

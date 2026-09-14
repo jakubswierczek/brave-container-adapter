@@ -7,14 +7,14 @@ public enum IconPreset: String, CaseIterable, Codable, Sendable {
 
     public var title: String { rawValue.capitalized }
 
-    var symbol: String? {
+    var letters: String? {
         switch self {
         case .monogram: nil
-        case .work: "briefcase.fill"
-        case .personal: "person.fill"
-        case .web: "globe"
-        case .layers: "square.3.layers.3d"
-        case .temporary: "sparkles"
+        case .work: "WK"
+        case .personal: "ME"
+        case .web: "WEB"
+        case .layers: "LYR"
+        case .temporary: "NEW"
         }
     }
 
@@ -83,20 +83,15 @@ public enum DestinationIcons {
                 let start = NSColor(calibratedHue: hue, saturation: 0.60, brightness: 0.96, alpha: 1)
                 let end = NSColor(calibratedHue: hue, saturation: 0.84, brightness: 0.64, alpha: 1)
                 NSGradient(starting: start, ending: end)?.draw(in: tile, angle: -90)
-                if let name = preset.symbol,
-                   let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(
-                    NSImage.SymbolConfiguration(pointSize: s * 0.5, weight: .semibold)
-                        .applying(NSImage.SymbolConfiguration(paletteColors: [.white]))) {
-                    let scale = min(s * 0.51 / symbol.size.width, s * 0.51 / symbol.size.height)
-                    let size = NSSize(width: symbol.size.width * scale, height: symbol.size.height * scale)
-                    symbol.draw(in: NSRect(x: (s - size.width) / 2, y: (s - size.height) / 2, width: size.width, height: size.height))
-                } else {
-                    let name = configuration.displayName.replacingOccurrences(of: "Brave — ", with: "")
-                    let mark = String(name.prefix(2)).uppercased() as NSString
-                    let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: s * 0.36, weight: .bold), .foregroundColor: NSColor.white]
-                    let size = mark.size(withAttributes: attrs)
-                    mark.draw(at: NSPoint(x: (s - size.width) / 2, y: (s - size.height) / 2), withAttributes: attrs)
-                }
+                // SF Symbols are not licensed for application icons. Use letter tiles.
+                let name = configuration.displayName.replacingOccurrences(of: "Brave — ", with: "")
+                let mark = (preset.letters ?? String(name.prefix(2)).uppercased()) as NSString
+                let fontSize = s * (mark.length > 2 ? 0.25 : 0.36)
+                let attrs: [NSAttributedString.Key: Any] = [
+                    .font: NSFont.systemFont(ofSize: fontSize, weight: .bold), .foregroundColor: NSColor.white,
+                ]
+                let size = mark.size(withAttributes: attrs)
+                mark.draw(at: NSPoint(x: (s - size.width) / 2, y: (s - size.height) / 2), withAttributes: attrs)
             }
         }
     }

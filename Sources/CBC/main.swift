@@ -42,9 +42,14 @@ private func sayError(_ message: String) { FileHandle.standardError.write(Data((
 @MainActor
 private func run() throws {
     let options = try Options(Array(CommandLine.arguments.dropFirst()))
+    if ["version", "--version"].contains(options.command) {
+        print("\(ReleaseVersion.version) \(ReleaseVersion.build)")
+        return
+    }
     if ["help", "--help", "-h"].contains(options.command) {
         print("""
         cbc list [--profile DIRECTORY] [path options]
+        cbc version
         cbc doctor [--app PATH | --profile DIRECTORY (--container-id ID | --temporary)] [path options]
         cbc generate --profile DIRECTORY (--container-id ID | --temporary) --output DIRECTORY [options]
         cbc install (--all | --profile DIRECTORY (--container-id ID | --temporary)) [options]
