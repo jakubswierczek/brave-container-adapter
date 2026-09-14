@@ -92,3 +92,61 @@ Downloading those assets with the GitHub CLI reproduced the checksum, ticket,
 signature, and Gatekeeper results, and confirmed the icon declaration and version.
 First opening a downloaded app on another Mac, Choosy delivery, and Intel runtime
 remain manual checks.
+
+## Temporary containers v1.2.0, 2026-09-14
+
+The installed Brave had updated to **1.95.101**, macOS bundle `153.1.95.101`.
+Its matching tagged source supports bare `--temporary-container` for a fresh
+container per launch. Adding `--container=NAME` would reuse a named temporary
+container; this adapter deliberately omits it.
+
+The GUI checks used a new copy of that installed app, with a distinct bundle
+identifier and ad-hoc signature, and the existing isolated Integration Data.
+The original Brave installation and personal profiles were unchanged. Routing
+was checked through native accessibility: URL address, container badge, and
+profile label. No cookie/history access or remote debugging was used.
+
+`scripts/test.sh` passed **34 tests**. New coverage includes temporary-mode
+configuration, stable identity, legacy named configuration and identity,
+unsupported versions and version changes between requests, missing configured
+lists, disabled/malformed preferences, missing profiles, conflicting modes,
+retained/duplicate names, exact launch arguments, and bundle updates. Optimized
+CLI and universal setup/receiver builds passed. Invalid CLI option combinations
+were rejected.
+
+| Live check | Observed result |
+| --- | --- |
+| Cold direct Swift `Process` | Default/Personal opened the neutral URL with a fresh Unable ghost badge |
+| Running direct `Process`, two URLs | Both URLs had Fat cram; a new container distinct from the first launch |
+| Generated app, separate URL events | Two `open -a RECEIVER URL1 URL2` URLs produced Know kangaroo and Lumber public. macOS split this invocation into two events |
+| Resident receiver, explicit URL-list event | `scripts/probe-url-batch.swift` delivered two URLs in one event; both had Opinion tell. Queries and fragments matched |
+| Two profiles open | Profile 1/Person 1 received Winner month; another Default request selected Personal with Tone joke. The requested window became visible |
+| No configured list | Profile 1 had saved enablement but no `list`; temporary CLI resolution, receiver launch, and setup selection all worked |
+| Last temporary tab closed | Winner month's retained record remained after its last tab closed. This checks metadata retention, not storage erasure |
+| Portable setup GUI | Extracted outside the checkout; selected test Brave/data, discovered six destinations, installed Temporary for Person 1. Footer and controls were visually inspected |
+| Installed temporary app | Local signature and format-2 configuration passed. URL delivery opened Person 1 with Remain when |
+| Installed receiver, cold Brave process | Opened Person 1 with Gallery cruel after the disposable browser was stopped. The copy did not exit after quit/SIGTERM, so only its verified main process was killed. This does not prove graceful session restoration |
+| Named routing regression on 1.95.101 | Updated generated receiver opened Default/Personal with Work badge |
+| Choosy, another Mac, Intel runtime | Not run; Choosy and another test Mac remain unavailable |
+
+The temporary app installed for this check was removed from the dedicated
+Applications directory after verification. It targeted the disposable Brave
+copy, not personal browsing. Existing demonstration apps were preserved.
+
+To repeat the temporary checks on a target Mac:
+
+1. Initialize a dedicated test profile and enable Containers through Brave's UI.
+2. Install Temporary for that profile and add it to Choosy's Browsers list.
+3. Send `https://example.com/?check=one#part` through Choosy twice. Verify the
+   selected profile and two different container badges, with Brave both closed
+   and running. Repeat with two profiles open.
+4. For an explicit batch, first open the generated receiver, then run
+   `swift scripts/probe-url-batch.swift RUNNING_TEST_RECEIVER_APP URL1 URL2` with
+   neutral HTTP/HTTPS URLs. Both tabs must have the same newly created badge.
+   Ordinary sender behavior may split a multi-link request into separate events.
+5. Close the test tab, restart Brave, and check restoration behavior through its
+   UI. Do not assume closing a tab deletes its data. Brave owns cleanup and may
+   retain references in the last session or tab restore entries.
+
+The version and saved-preference guards do not remove the race with Brave's
+in-memory state or prove final-tab isolation. Repeat these checks after updates.

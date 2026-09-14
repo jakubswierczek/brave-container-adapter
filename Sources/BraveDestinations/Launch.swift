@@ -4,6 +4,7 @@ import Foundation
 public struct BraveInstallation: Sendable {
     public let paths: BravePaths
     public let version: String
+    public let supportsTemporaryContainers: Bool
 
     public init(paths: BravePaths) throws {
         let plistURL = URL(fileURLWithPath: paths.application).appendingPathComponent("Contents/Info.plist")
@@ -18,12 +19,19 @@ public struct BraveInstallation: Sendable {
         let parts = components.compactMap { Int($0) }
         // macOS bundle version includes the Chromium major: 150.1.92.140.
         let braveVersion = parts.count == 4 ? Array(parts.dropFirst()) : parts
-        guard parts.count == components.count, braveVersion.count == 3,
+        guard parts.count == components.count, parts.allSatisfy({ $0 >= 0 }), braveVersion.count == 3,
               !braveVersion.lexicographicallyPrecedes([1, 92, 140]) else {
             throw AdapterError("Brave is older than the inspected 1.92.140 build. Container routing is not supported by this adapter for this version.")
         }
         self.paths = paths
         self.version = version
+        supportsTemporaryContainers = !braveVersion.lexicographicallyPrecedes([1, 95, 101])
+    }
+
+    public func requireTemporaryContainers() throws {
+        guard supportsTemporaryContainers else {
+            throw AdapterError("Temporary destinations require Brave 1.95.101 or later. Update Brave before using this app; nothing was opened.")
+        }
     }
 }
 
@@ -60,7 +68,7 @@ public struct LaunchRequest: Sendable {
         arguments = [
             "--user-data-dir=\(userData)",
             "--profile-directory=\(resolved.profile.directory)",
-            "--container=\(resolved.container.name)",
+            resolved.container.launchArgument,
             "--",
         ] + urls.map(\.original)
         guard arguments.reduce(0, { $0 + $1.utf8.count + 1 }) < 128 * 1024 else {

@@ -43,7 +43,7 @@ final class Setup: NSObject, NSApplicationDelegate {
         location.textColor = .secondaryLabelColor
         status.setAccessibilityLabel("Setup status")
         let footer = NSTextField(wrappingLabelWithString:
-            "Configure containers in Brave Settings → Content. If none appear, add or edit a container there, wait for Brave to save, then Refresh. Your default browser stays unchanged.")
+            "Temporary opens each request in a fresh container; URLs received together share it. Brave may retain temporary data for tab restoration. Requires Brave 1.95.101+. Enable Containers in Brave Settings → Content, wait for settings to save, then Refresh. Your default browser stays unchanged.")
         footer.font = .systemFont(ofSize: 12)
         footer.textColor = .secondaryLabelColor
         let stack = NSStackView(views: [title, instructions, picker, buttons, status, pathsButtons, location, footer])
@@ -88,19 +88,27 @@ final class Setup: NSObject, NSApplicationDelegate {
         picker.removeAllItems()
         location.stringValue = "Brave: \(paths.application)\nData: \(paths.userData)"
         do {
-            _ = try BraveInstallation(paths: paths)
+            let installation = try BraveInstallation(paths: paths)
             let discovery = Discovery(paths: paths)
             var unavailable = 0
             var firstProblem: String?
             for profile in try discovery.profiles() {
                 do {
                     let snapshot = try discovery.containers(profileDirectory: profile.directory)
-                    guard snapshot.enabled, let containers = snapshot.configured else {
+                    guard snapshot.enabled else {
                         unavailable += 1
                         firstProblem = firstProblem ?? "Enable Containers and add or edit a container in Brave’s UI. Wait for the settings to save, then Refresh."
                         continue
                     }
-                    for container in containers {
+                    if installation.supportsTemporaryContainers {
+                        let temporary = try Destination(paths: paths, profileDirectory: profile.directory, selection: .temporary)
+                        destinations.append(try discovery.resolve(temporary))
+                    }
+                    if snapshot.configured == nil {
+                        unavailable += 1
+                        firstProblem = firstProblem ?? "Add or edit a named container in Brave’s UI, then Refresh."
+                    }
+                    for container in snapshot.configured ?? [] {
                         let destination = try Destination(paths: paths, profileDirectory: profile.directory, containerID: container.id)
                         destinations.append(try discovery.resolve(destination))
                     }

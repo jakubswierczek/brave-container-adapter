@@ -7,6 +7,7 @@ private struct Options {
     let command: String
     var values: [String: String] = [:]
     var all = false
+    var temporary = false
 
     init(_ arguments: [String]) throws {
         command = arguments.first ?? "help"
@@ -16,6 +17,10 @@ private struct Options {
             if key == "--all" {
                 guard !all else { throw AdapterError("Repeated --all option.") }
                 all = true; index += 1; continue
+            }
+            if key == "--temporary" {
+                guard !temporary else { throw AdapterError("Repeated --temporary option.") }
+                temporary = true; index += 1; continue
             }
             guard ["--brave", "--user-data-dir", "--profile", "--container-id", "--output", "--receiver", "--name", "--app"].contains(key),
                   index + 1 < arguments.count, values[key] == nil else {
@@ -40,13 +45,14 @@ private func run() throws {
     if ["help", "--help", "-h"].contains(options.command) {
         print("""
         cbc list [--profile DIRECTORY] [path options]
-        cbc doctor [--app PATH | --profile DIRECTORY --container-id ID] [path options]
-        cbc generate --profile DIRECTORY --container-id ID --output DIRECTORY [options]
-        cbc install (--all | --profile DIRECTORY --container-id ID) [options]
+        cbc doctor [--app PATH | --profile DIRECTORY (--container-id ID | --temporary)] [path options]
+        cbc generate --profile DIRECTORY (--container-id ID | --temporary) --output DIRECTORY [options]
+        cbc install (--all | --profile DIRECTORY (--container-id ID | --temporary)) [options]
 
         Path options: --brave APP --user-data-dir DIRECTORY
         Generation options: --receiver EXECUTABLE --name LABEL
-        --all may be restricted with --profile. It installs enabled, saved destinations.
+        --all may be restricted with --profile. It installs enabled, saved configured containers.
+        --temporary creates a fresh container per incoming URL batch; requires Brave 1.95.101+.
         install uses ~/Applications/Choosy Brave Containers. Existing destinations keep their IDs.
         No command changes Brave preferences or the default browser.
         """)
@@ -55,6 +61,9 @@ private func run() throws {
     guard ["list", "doctor", "generate", "install"].contains(options.command) else {
         throw AdapterError("Unknown command. Run cbc help.")
     }
+    guard !options.temporary || (options.command != "list" && !options.all && options.values["--container-id"] == nil && options.values["--app"] == nil) else {
+        throw AdapterError("--temporary requires doctor, generate, or install and cannot be combined with --all, --container-id, or --app.")
+    }
     var paths = options.paths
     var selected: Destination?
     if let app = options.values["--app"] {
@@ -62,6 +71,13 @@ private func run() throws {
         let config = try DestinationConfiguration.read(from: URL(fileURLWithPath: BravePaths.canonical(app)).appendingPathComponent("Contents/Resources/destination.json"))
         paths = config.destination.paths
         selected = config.destination
+    }
+    if selected == nil, options.temporary || options.values["--container-id"] != nil {
+        guard let profile = options.values["--profile"] else {
+            throw AdapterError("A container destination requires --profile DIRECTORY.")
+        }
+        let selection: ContainerSelection = options.temporary ? .temporary : .configured(id: options.values["--container-id"]!)
+        selected = try Destination(paths: paths, profileDirectory: profile, selection: selection)
     }
     let installation = try BraveInstallation(paths: paths)
     let discovery = Discovery(paths: paths)
@@ -76,6 +92,9 @@ private func run() throws {
             do {
                 let snapshot = try discovery.containers(profileDirectory: profile.directory)
                 print("  Containers: \(snapshot.enabled ? "enabled" : "disabled or not explicitly saved")")
+                if try snapshot.enabled && installation.supportsTemporaryContainers && !discovery.explicitlyDisabledFeature() {
+                    print("  temporary  --temporary  Fresh container per incoming URL batch")
+                }
                 if let configured = snapshot.configured {
                     for container in configured { print("  configured  \(container.id)  \(container.name)") }
                     if configured.isEmpty { print("  No configured containers.") }
@@ -88,7 +107,7 @@ private func run() throws {
                 } else {
                     print("  Retained snapshots: \(snapshot.retained.count) (configured list unavailable; not offered as destinations)")
                 }
-                if options.command == "doctor" {
+                if options.command == "doctor" && selected == nil {
                     for container in snapshot.configured ?? [] where snapshot.enabled {
                         _ = try discovery.resolve(Destination(paths: paths, profileDirectory: profile.directory, containerID: container.id))
                     }
@@ -97,9 +116,6 @@ private func run() throws {
             } catch { failed = true; sayError("  " + ((error as? AdapterError)?.message ?? "Metadata inspection failed.")) }
         }
         if options.command == "list" { if failed { throw AdapterError("Some profiles could not be read.") }; return }
-        if selected == nil, let profile = options.values["--profile"], let id = options.values["--container-id"] {
-            selected = try Destination(paths: paths, profileDirectory: profile, containerID: id)
-        }
         if let selected {
             let resolved = try discovery.resolve(selected)
             print("Destination resolves: \(resolved.displayName)")
@@ -108,7 +124,7 @@ private func run() throws {
         let handler = NSWorkspace.shared.urlForApplication(toOpen: URL(string: "https://example.com")!)
         print("HTTPS default: \(handler?.deletingPathExtension().lastPathComponent ?? "unavailable") (unchanged)")
         print("Inspection is read-only. GUI container selection is not confirmed by doctor.")
-        print("Tested source/binary: Brave 1.92.140. Later versions require a live routing check.")
+        print("Named routing baseline: Brave 1.92.140. Temporary routing requires 1.95.101+. Verify routing after Brave updates.")
         if try discovery.explicitlyDisabledFeature() { throw AdapterError("Containers feature is explicitly disabled in brave://flags.") }
         if failed { throw AdapterError("One or more profiles are not ready. See diagnostics above.") }
         return
@@ -138,10 +154,10 @@ private func run() throws {
             }
         }
     } else {
-        guard let profile = options.values["--profile"], let id = options.values["--container-id"] else {
-            throw AdapterError("Choose --all or supply --profile DIRECTORY and --container-id ID from cbc list.")
+        guard let selected else {
+            throw AdapterError("Choose --all or supply --profile DIRECTORY with --container-id ID or --temporary.")
         }
-        destinations = [try discovery.resolve(Destination(paths: paths, profileDirectory: profile, containerID: id))]
+        destinations = [try discovery.resolve(selected)]
     }
     guard !destinations.isEmpty else { throw AdapterError("No enabled, saved container destinations were found. Configure containers in Brave's UI, then run list.") }
     for resolved in destinations {

@@ -105,16 +105,23 @@ public struct Discovery: Sendable {
         guard snapshot.enabled else {
             throw AdapterError("Containers is disabled or its enabled preference is not saved. Enable Containers in Brave Settings > Content, wait for preferences to save, then retry.")
         }
+        let containerID: String
+        switch destination.selection {
+        case .temporary:
+            try BraveInstallation(paths: paths).requireTemporaryContainers()
+            return ResolvedDestination(destination: destination, profile: profile, container: .temporary)
+        case .configured(let id): containerID = id
+        }
         guard let configured = snapshot.configured else {
             throw AdapterError("Brave has not saved its container list. Add a container or edit and save one in Brave's UI, then wait for preferences to save. Built-in localized defaults are not inferred from retained records.")
         }
-        guard let container = configured.first(where: { $0.id == destination.containerID }) else {
+        guard let container = configured.first(where: { $0.id == containerID }) else {
             throw AdapterError("This container was deleted or is no longer configured. Retained records are not launch destinations. Run cbc list and regenerate the app for an existing container.")
         }
         // Brave compares UTF-8 bytes, not Swift's canonically equivalent String equality.
         guard configured.filter({ $0.name.utf8.elementsEqual(container.name.utf8) }).count == 1 else {
             throw AdapterError("Multiple configured containers have the same name. Rename one in Brave before opening links.")
         }
-        return ResolvedDestination(destination: destination, profile: profile, container: container)
+        return ResolvedDestination(destination: destination, profile: profile, container: .configured(container))
     }
 }
