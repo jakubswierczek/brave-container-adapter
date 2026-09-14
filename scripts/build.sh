@@ -8,5 +8,11 @@ fi
 xcrun swift build -c release
 mkdir -p dist/bin
 build_dir="$(xcrun swift build -c release --show-bin-path)"
-cp "$build_dir/cbc" "$build_dir/ContainerReceiver" dist/bin/
+# Replace each inode so macOS does not retain an earlier executable's signature cache.
+stage="$(mktemp -d "$PWD/dist/.bin.XXXXXX")"
+trap 'rm -rf "$stage"' EXIT
+for executable in cbc ContainerReceiver; do
+  cp "$build_dir/$executable" "$stage/$executable"
+  mv -f "$stage/$executable" "dist/bin/$executable"
+done
 echo 'Built dist/bin/cbc and dist/bin/ContainerReceiver'
