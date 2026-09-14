@@ -25,11 +25,14 @@ See the [runner retirement notice](https://github.com/actions/runner-images/issu
 ## Change and release controls
 
 Issues and pull requests are disabled at the owner's request. Maintainer changes
-use a work branch: push it, run `gh workflow run ci.yml --ref BRANCH`, and wait for
-the aggregate `checks` status on that exact commit. Fast-forward `main` only after
+use a work branch: push it and wait for the automatic branch CI run to report the
+aggregate `checks` status on that exact commit. Fast-forward `main` only after
 CI passes and the branch includes current `main`. Required CI also applies to
 admins; do not bypass it. Force pushes and branch deletion remain blocked. Version
 tags permit creation but block movement and deletion.
+
+Use push-triggered CI for this gate. During publication, GitHub did not accept a
+successful manually dispatched run as the required check for a direct push.
 
 Keep Actions read-only and pin external actions by full commit SHA. Do not add
 signing credentials to CI or use `pull_request_target` to run contribution code.

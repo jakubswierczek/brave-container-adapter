@@ -2,7 +2,7 @@ name: macOS checks
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   workflow_dispatch:
 
 permissions:
