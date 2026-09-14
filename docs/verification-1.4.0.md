@@ -66,8 +66,30 @@ No final-tab check was inferred from process exit status or from stale UI output
   there, not browser UI.
 - Full VoiceOver and keyboard-only navigation pass. Standard editing shortcuts and
   accessibility labels were checked, but this is not a complete accessibility audit.
-- The final package's acceptance, tickets, checksum and fresh download belong in the
-  release notes. Do not infer notarization from the version number or filename.
 
 The adapter still has the documented saved-preferences/name-routing race. It cannot
 verify cookie isolation or Brave's final tab through a supported public acknowledgment.
+
+## Distribution and repository controls
+
+[v1.4.0](https://github.com/jakubswierczek/brave-container-adapter/releases/tag/v1.4.0)
+uses source `a6e486737ac887d66acf3c6a79e8d0f4d00e88a8`, version 1.4.0/build 8.
+[CI run 34858003761](https://github.com/jakubswierczek/brave-container-adapter/actions/runs/34858003761)
+passed on that exact source, including all three runtime jobs and universal packaging.
+
+Apple accepted app submission `03ee66bb-670c-4a75-aa81-1eb348d2cd95` and DMG submission
+`178dab74-22e3-498c-86b4-6a1c5873b6d9`. Both artifacts were stapled and passed signature,
+ticket and Gatekeeper checks. The DMG mounted read-only with Setup, an Applications
+shortcut and `Read Me.txt`. The copied Setup opened normally on the build Mac.
+Both executables contain arm64 and x86_64 slices. The source/toolchain manifest was
+checked, with no uncommitted changes, and the MIT license is bundled.
+
+A fresh GitHub CLI download matched the checksum and passed signature, staple, image-integrity and Gatekeeper checks. This does not simulate browser quarantine on another Mac.
+
+DMG SHA-256: `49420c75916e16f6a1085f7eaaec34acc2b961a5b3dda8e5bb655ec07eee0413`.
+
+`main` now requires pull requests, resolved conversations and the strict `checks`
+status. Admins are included; force pushes and branch deletion are disabled. A sole
+maintainer needs no second approval. Active version-tag rules prevent movement and
+deletion. These settings were read back from GitHub; they are not merely a proposed
+policy. Signing credentials remain local. Repository visibility remains private.

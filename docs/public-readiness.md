@@ -13,6 +13,7 @@ public-account settings must not be reported as complete without evidence.
 
 | Finding | Change and evidence |
 | --- | --- |
+| Repository controls | `main` requires a pull request, resolved conversations and the strict `checks` status, including for admins. Force pushes/deletion are blocked. Active version-tag rules block updates/deletion while allowing new tags. |
 | Missing license | Owner confirmed publication rights, including employer-related rights. [MIT](../LICENSE) covers code, documentation and project-owned artwork; contribution and asset terms updated. |
 | Unbounded receiver queue | Maximum 32 pending batches/1 MiB; each batch accepts 128 URLs/128 KiB, with 64 KiB per URL. Rejects the newest batch atomically; preserves accepted duplicates and FIFO. Unit tests and a real event during an alert passed. |
 | Blocking signing/registration | Async native helpers, 15-second timeout and cancellation. Setup stays available to cancel. Tests verify timeout, cancellation and preservation of unrelated processes/apps. |
@@ -35,7 +36,6 @@ public-account settings must not be reported as complete without evidence.
 | Second-Mac distribution | Owner agreed to test. Still needs a normal browser download, first open, generated app and actual switcher handoff. No result is claimed. |
 | Private vulnerability reporting | GitHub's endpoint is unavailable while this repo is private. Enable and verify the reporting form immediately when publication is authorized. Until then, [SECURITY.md](../SECURITY.md) states the private-access contact procedure. |
 | Public security settings | Verify secret scanning and push protection availability after the visibility change. No null/unavailable API field counts as enabled. |
-| Packages inventory | The current token lacks `read:packages`; package inventory cannot be certified from that API response. The owner must inspect linked packages before opening, or provide a permitted read-only path. No token scope was widened. |
 | Visibility change | Not authorized by this remediation request. Repo stays private until explicit owner approval. |
 
 Full VoiceOver testing and browser GUI checks on Intel/minimum macOS are additional
@@ -43,6 +43,20 @@ compatibility work. Public wording must retain those limits. CI coverage is evid
 of adapter runtime logic on those systems, not evidence of all browser behavior.
 
 ## Privacy and repository surfaces
+
+The final pre-release scan covered 19 remote commits and 138 unique blobs through
+`a6e486737ac887d66acf3c6a79e8d0f4d00e88a8`: Gitleaks and targeted private-path/key/mail
+checks reported zero findings. The positive control was rerun successfully. The
+exact v1.4.0 DMG payload also passed both scans, and its clean-source build manifest
+and MIT license were checked. Signatures intentionally retain publisher identity.
+
+Live GitHub inventory at release preparation: private repository, one collaborator
+(the owner), no issues/PRs yet, no Actions artifacts, secrets, variables, environments,
+webhooks or deploy keys, no Pages, discussions or forks. The unused wiki was disabled.
+REST package details required a missing scope, but the permitted GraphQL
+`repository.packages.totalCount` query returned **0**. No token scope was widened.
+The later documentation pull request contains only public-safe release evidence.
+
 
 The initial audit scanned a fresh remote bare clone and all five then-published ZIP
 release payloads. Gitleaks 8.30.1 was verified against its official SHA-256 and tested
@@ -53,8 +67,7 @@ GitHub noreply addresses. These checks do not prove that every secret format is 
 
 The five old ZIP releases were removed at the owner's request. Source tags remain
 for traceability. v1.3.1 introduced the signed DMG; withdrawn binaries containing
-SF Symbols must not be republished. Current release evidence belongs in the release
-notes and [signing guide](signing.md).
+SF Symbols must not be republished. The current [v1.4.0 DMG](https://github.com/jakubswierczek/brave-container-adapter/releases/tag/v1.4.0) passed Developer ID, Apple notarization, staple, Gatekeeper, mount/copy and local first-launch checks. See [verification](verification-1.4.0.md) and the [signing guide](signing.md).
 
 Before publication, re-scan the final remote refs and exact DMG, and inspect Actions
 logs/artifacts, issues, pull requests, wiki, packages, releases, collaborators,
