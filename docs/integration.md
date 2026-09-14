@@ -56,10 +56,18 @@ The universal setup ZIP was extracted outside the checkout and launched on the A
 
 Both setup and bundled receiver compile for arm64 and x86_64; packaging checks both slices and the app signature. The 24 automated tests pass with the setup target included. The artifact contains no destination configuration or browser preferences. No Intel runtime, second Mac, downloaded-file Gatekeeper approval, or Choosy interaction was available for testing. Follow the README's target-Mac steps to complete those checks.
 
-## Developer ID release candidate, 2026-09-14
+## Developer ID release, 2026-09-14
 
 The v1.1.1 setup app and embedded receiver were signed with a valid individual Developer ID Application identity. Both signatures have secure timestamps and Hardened Runtime enabled. Strict signature verification passed, and both executables contain arm64 and x86_64 slices. The 24 automated tests passed again. The build ZIP was checked for browser configuration and private build paths; none were found.
 
 The signed setup app launched from a copy outside the checkout. Process inspection confirmed that executable's path. The native GUI discovered four configured destinations in the isolated test data and installed Social successfully. The generated destination's local signature was verified, then the temporary destination was removed. This does not replace the still-missing Choosy and second-Mac checks.
 
-Notarization submission `931511ca-ffa1-4763-98d2-854823150a5e`, created at `2026-09-14T08:55:55Z`, is pending. Gatekeeper currently reports `Unnotarized Developer ID`. No notarized v1.1.1 distribution has been published. Continue the same submission; do not treat this pending state as a rejected archive or submit another copy merely to retry the wait.
+Notarization submission `931511ca-ffa1-4763-98d2-854823150a5e`, created at `2026-09-14T08:55:55Z`, was observed as `Accepted` about 57 minutes after submission. Apple's log reports `Ready for distribution` with no issues. The original script stopped waiting after 30 minutes; processing continued at Apple. The existing signed app was used to finish the same submission without rebuilding or re-signing.
+
+Apple's ticket was attached and validated. Strict signature verification passed for the app and embedded receiver. Gatekeeper accepted the app as `Notarized Developer ID`. A fresh extraction of the final ZIP passed the same ticket and signature checks, verified version 1.1.1, and passed the browser-data/private-path archive scan. The notarized ZIP and SHA-256 file are published in [v1.1.1](https://github.com/jakubswierczek/choosy-brave-containers/releases/tag/v1.1.1), built from `cd0ee22ba8b3e379d82a956972401309f89373b8`.
+
+The published assets were downloaded again with the GitHub CLI. The checksum,
+attached ticket, both signatures, and Gatekeeper assessment passed. A CLI
+download does not reproduce a browser download's first-open quarantine flow.
+
+The new setup icon is prepared in v1.1.2 source and local packages. That build has not been submitted for notarization. The v1.1.1 approval applies to the original artifact. First opening a downloaded app on another Mac, Choosy delivery, and Intel runtime remain manual checks.
