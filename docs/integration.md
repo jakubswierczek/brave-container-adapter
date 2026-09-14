@@ -55,3 +55,11 @@ After Brave/macOS/Choosy upgrades, repeat the routing checks. The gap between sa
 The universal setup ZIP was extracted outside the checkout and launched on the Apple silicon test Mac. Its empty-state message and disabled install button were checked against the standard data location. Selecting the isolated test data folder discovered four configured destinations. Selecting Social and clicking Install destination generated a standalone app and revealed it in Finder. Its signature and both receiver architectures were verified. The temporary Social app was removed after this check.
 
 Both setup and bundled receiver compile for arm64 and x86_64; packaging checks both slices and the app signature. The 24 automated tests pass with the setup target included. The artifact contains no destination configuration or browser preferences. No Intel runtime, second Mac, downloaded-file Gatekeeper approval, or Choosy interaction was available for testing. Follow the README's target-Mac steps to complete those checks.
+
+## Developer ID release candidate, 2026-09-14
+
+The v1.1.1 setup app and embedded receiver were signed with a valid individual Developer ID Application identity. Both signatures have secure timestamps and Hardened Runtime enabled. Strict signature verification passed, and both executables contain arm64 and x86_64 slices. The 24 automated tests passed again. The build ZIP was checked for browser configuration and private build paths; none were found.
+
+The signed setup app launched from a copy outside the checkout. Process inspection confirmed that executable's path. The native GUI discovered four configured destinations in the isolated test data and installed Social successfully. The generated destination's local signature was verified, then the temporary destination was removed. This does not replace the still-missing Choosy and second-Mac checks.
+
+Notarization submission `931511ca-ffa1-4763-98d2-854823150a5e`, created at `2026-09-14T08:55:55Z`, is pending. Gatekeeper currently reports `Unnotarized Developer ID`. No notarized v1.1.1 distribution has been published. Continue the same submission; do not treat this pending state as a rejected archive or submit another copy merely to retry the wait.

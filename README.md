@@ -17,7 +17,7 @@ The local environment had no discoverable Choosy installation and reported Safar
 
 ## Use on another Mac
 
-1. On the target Mac, sign into the GitHub account that can access this private repository. Download `Brave-Container-Setup-universal.zip` from [Releases](https://github.com/jakubswierczek/choosy-brave-containers/releases/latest).
+1. On the target Mac, sign into the GitHub account that can access this private repository. Download `Brave-Container-Setup-notarized.zip` from [Releases](https://github.com/jakubswierczek/choosy-brave-containers/releases/latest). It includes Apple silicon and Intel binaries. The older v1.1.0 release uses the ad-hoc signed `Brave-Container-Setup-universal.zip` instead.
 2. Extract the ZIP, move **Brave Container Setup.app** to Applications, and open it. Requires macOS 14 or later.
 3. Install and initialize Brave and Choosy on that Mac. Enable Containers in Brave Settings > Content. Add or edit a container and let Brave save its settings.
 4. In the setup app, click **Refresh**, select a container/profile, then **Install destination**. Repeat for each destination. For nonstandard locations, use **Choose Brave…** and **Choose data folder…**; select the data folder containing `Local State`.
@@ -26,9 +26,9 @@ The local environment had no discoverable Choosy installation and reported Safar
 
 The setup ZIP contains code and documentation, with no browser data or destination configuration. It discovers paths and containers on the Mac where it runs. **Transfer the setup app, not destination apps generated on another Mac.** You can quit or remove the setup app after installation; destination apps are standalone.
 
-The setup app is ad-hoc signed, **not Developer ID signed or notarized**. If macOS blocks its first launch, follow [Apple's Open Anyway instructions](https://support.apple.com/en-us/102445): first attempt to open the app, then use System Settings > Privacy & Security > Open Anyway and confirm. Only approve the artifact obtained from this repository. Do not disable Gatekeeper globally. Download/quarantine approval has not been tested here.
+The `-notarized.zip` distribution contains a Developer ID signed setup app with Apple's notarization ticket attached. A normal first-open confirmation may still appear. The older v1.1.0 download and default local package builds are ad-hoc signed; those may need [Apple's Open Anyway procedure](https://support.apple.com/en-us/102445). Only approve artifacts obtained from this repository. Do not disable Gatekeeper globally.
 
-For a Developer ID release, see [signing and notarization](docs/signing.md). The release script requires a local company or individual signing identity and saved notarization credentials. The published v1.1.0 ZIP remains ad-hoc signed until that process succeeds.
+For release signing, see [signing and notarization](docs/signing.md). The release script requires a local company or individual signing identity and saved notarization credentials. Destination apps generated on your Mac retain local ad-hoc signatures; they do not inherit the setup app's notarization ticket.
 
 To update, download the newer setup app, quit the relevant destination receiver in Activity Monitor, and install the same destination again. Its bundle identity and existing filename stay stable. Container renames need no update for routing; reinstall to refresh the label.
 

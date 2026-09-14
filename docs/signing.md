@@ -1,26 +1,27 @@
 # Developer ID signing
 
-The published v1.1.0 ZIP is ad-hoc signed. A company Apple Developer Program membership can provide Developer ID signing, but membership alone does not install a certificate or grant certificate creation rights.
+The published v1.1.0 ZIP is ad-hoc signed. Developer ID releases use the `-notarized.zip` filename. An individual or company Apple Developer Program membership can provide Developer ID signing, but membership alone does not install a certificate or grant certificate creation rights.
 
 Apple lists **Account Holder** as the role required to create a Developer ID certificate. Some admins have access to cloud-managed certificates. This script needs a **local Developer ID Application certificate and its private key**; an Apple Development certificate or cloud-only identity does not satisfy it. See [Apple's certificate instructions](https://developer.apple.com/help/account/certificates/create-developer-id-certificates).
 
 ## Prepare the signing Mac
 
-1. In Xcode Settings, select Apple Accounts (Accounts in some versions), your Apple ID, then the company team. Open Manage Certificates. If permitted, add **Developer ID Application**. If this option is unavailable, the company's Account Holder must help provision the signing identity. Do not revoke existing certificates.
+1. In Xcode Settings, select Apple Accounts (Accounts in some versions), your Apple ID, then the paid individual or company team. Open Manage Certificates. If permitted, add **Developer ID Application**. If this option is unavailable, the team's Account Holder must help provision the signing identity. A free Personal Team cannot issue this certificate. Do not revoke existing certificates.
 2. Check locally:
 
    ```bash
    security find-identity -v -p codesigning
    ```
 
-   Copy the 40-character hash next to the intended `Developer ID Application` identity. The signature will identify the company.
+   Copy the 40-character hash next to the intended `Developer ID Application` identity. The signature identifies that individual or company.
 3. Save notarization credentials in Keychain using an interactive Terminal session:
 
    ```bash
-   xcrun notarytool store-credentials cbc-notary
+   xcrun notarytool store-credentials cbc-notary \
+     --apple-id 'YOUR_APPLE_ID_EMAIL' --team-id 'YOUR_TEAM_ID'
    ```
 
-   Follow the prompts for your Apple ID, the company Team ID, and an app-specific password. Obtain the password through your Apple Account's security settings. Enter it only into the local secure prompt, never in chat or a committed file. A suitable App Store Connect API key is another supported authentication method; see `xcrun notarytool store-credentials --help`.
+   Use the team associated with your signing certificate. Find its Team ID in your developer account's Membership details. At the secure prompt, enter an [app-specific password](https://support.apple.com/en-us/102654) generated at account.apple.com under Sign-In and Security. This differs from your normal account password and the password protecting a certificate export. Enter it only locally, never in chat or a committed file. The explicit flags select Apple ID authentication without asking for an API private key. A suitable App Store Connect API key is another supported authentication method; see `xcrun notarytool store-credentials --help`.
 
 ## Build and notarize
 
@@ -40,4 +41,4 @@ After success, test the ZIP downloaded onto another Mac and publish that exact Z
 
 Signing covers the portable setup app and its embedded receiver. Generated destination apps have local configuration and new bundle identities; the generator ad-hoc signs those apps on the destination Mac. They do not inherit the setup app's notarization ticket. The signing private key is never embedded in the setup or destination apps.
 
-Local verification on 2026-09-13 covered script syntax, argument validation, and rejection of a missing identity before building or uploading. Developer ID signing, Apple's acceptance, ticket stapling, and the resulting Gatekeeper behavior remain untested because this Mac has no signing identity. The existing ad-hoc release remains unchanged.
+Local verification on 2026-09-13 covered script syntax, argument validation, and rejection of a missing identity before building or uploading. On 2026-09-14, a valid individual Developer ID identity signed v1.1.1's setup app and receiver; both signatures, secure timestamps, and Hardened Runtime flags were verified. All 24 tests passed, and the setup GUI still installed an isolated test destination. See [the integration record](integration.md) for notarization and distribution status.
