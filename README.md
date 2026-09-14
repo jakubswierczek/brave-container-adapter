@@ -19,8 +19,8 @@ Generate destination apps on each Mac. They contain local paths and configuratio
 
 - macOS 14+. The DMG includes Apple silicon and Intel binaries. No Xcode is needed to run it.
 - Brave Containers: named routing requires 1.92.140+; temporary routing requires 1.95.101+.
-- Tested on Apple silicon, macOS 26.6.2, with Brave 1.92.140 and 1.95.101. Intel and macOS 14 runtime checks remain open.
-- Third-party switcher delivery has not yet been tested. GUI routing checks used an isolated copy of Brave. See the [test record](docs/testing.md).
+- Tested on Apple silicon, macOS 26.6.2, with Brave 1.92.140 and 1.95.101. CI covers adapter logic on macOS 14/15 and Intel macOS 15; browser GUI checks on those systems remain open.
+- Choosy 2.5.2 handoff passed with unmodified Brave 1.95.101, cold and running. Other switchers and the second-Mac download flow need verification. See the [test record](docs/testing.md).
 
 Discovery reads Brave's internal preference format. Named routing resolves a saved container ID to its current name before invoking Brave directly. A rename/delete race between saved preferences and Brave's in-memory state can still cause incorrect routing. **This adapter is not an isolation security boundary.** Check the container badge before sensitive browsing.
 
@@ -48,4 +48,4 @@ dist/bin/cbc list
 dist/bin/cbc install --profile Default --temporary
 ```
 
-This is an independent utility, not an official Brave product. Code, documentation and project-owned artwork use the [MIT license](LICENSE). No rights to third-party trademarks are granted. The repository remains private while release checks are completed.
+This is an independent utility, not an official Brave product. Code, documentation and project-owned artwork use the [MIT license](LICENSE). No rights to third-party trademarks are granted.

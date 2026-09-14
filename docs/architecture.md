@@ -92,7 +92,7 @@ The receiver validates the entire incoming batch, loads its destination, and rea
 
 For Temporary, `--temporary-container` replaces `--container=Current Name`. It never sends both switches; a container name would make Brave reuse a named temporary container.
 
-These are separate `Process.arguments` elements, not a shell command. `open -a Brave --args` is not used. Brave handles its existing-instance handoff. The adapter also checks the data directory's singleton owner and rejects a different running installation or an owner it cannot establish. A malformed, foreign-host or unreadable singleton lock fails closed. A stale lock with no live process permits launch. Activation targets that browser process after the handoff; a live check must still confirm the intended profile window. Failure to confirm foreground activation within about nine seconds produces an error; it does not resend the URL.
+These are separate `Process.arguments` elements, not a shell command. `open -a Brave --args` is not used. Brave handles its existing-instance handoff. The adapter uses Chromium's POSIX hostname (`gethostname`), not Foundation's potentially different DNS name. It checks the data directory's singleton owner and rejects a different running installation or an owner it cannot establish. A malformed, foreign-host or unreadable singleton lock fails closed. A stale lock with no live process permits launch. Activation targets that browser process after the handoff; a live check must still confirm the intended profile window. Failure to confirm foreground activation within about nine seconds produces an error; it does not resend the URL.
 
 HTTP/HTTPS text from raw URL Apple events is passed unchanged after validation, including percent escapes, Unicode, queries and fragments. AppKit-batched URLs use the representation AppKit supplies; the adapter cannot undo normalization already performed by a sender or macOS. Unsupported schemes, invalid escapes, whitespace/control characters, and empty hosts are rejected. Batches larger than the conservative 128 KiB argument budget are rejected with an error; split them into smaller batches.
 
@@ -123,7 +123,7 @@ Ownership markers identify managed bundles. They do not authenticate an untruste
 - Temporary containers follow Brave's retention and restoration rules. Closing their last tab does not guarantee that data is erased.
 - Effective feature rollout/command-line overrides cannot be fully inferred from saved files. Explicit `containers@2` is rejected, but a contradictory running-process flag or future rollout change still needs a GUI check.
 - Browser startup/onboarding, a profile picker, crash recovery, a locked profile, or a broken Brave process can interrupt handoff. Initialize each profile manually before generating apps. The CLI does not read cookies, history, or internal Mojo settings interfaces.
-- Native UI tests used an isolated copy of the installed Brave binary with a distinct bundle identifier and ad-hoc signature, because the GUI tool otherwise selected the personal instance. See the integration record for this test boundary.
+- Early UI tests used an isolated copy with a distinct bundle identifier. Version 1.4.0 also received unmodified vendor-Brave checks with disposable profiles after the owner approved briefly quitting personal Brave. See the [current verification record](verification-1.4.0.md) for exact coverage.
 
 ## Source references
 

@@ -27,7 +27,7 @@ system executable. Passing them does not certify browser routing.
 
 ## Recorded integration coverage
 
-The [historical record](integration.md) contains dates and exact evidence. Named
+The [1.4.0 record](verification-1.4.0.md) contains the current vendor-Brave and switcher checks. The [historical record](integration.md) retains earlier test-copy evidence. Named
 routing was checked on Brave 1.92.140; temporary and appearance checks used 1.95.101.
 The host was Apple silicon on macOS 26.6.2 with Swift 6.3.3.
 
@@ -40,12 +40,12 @@ The host was Apple silicon on macOS 26.6.2 with Swift 6.3.3.
 | Temporary containers | Fresh per event; one shared container for an explicit URL batch |
 | App names, generated/custom icons and stable identity | Passed for v1.3.0; current changes need their own record |
 | Developer ID distribution | Older ZIP signatures/tickets and fresh CLI downloads passed |
-| Unmodified vendor Brave, final profile/container GUI assertion | Still required |
-| Third-party switcher to generated app to Brave | Still required |
+| Unmodified vendor Brave, final profile/container GUI assertion | Passed with 1.95.101 for the 1.4.0 candidate |
+| Third-party switcher to generated app to Brave | Choosy 2.5.2, cold and running, passed |
 | Second Mac and normal browser-download first-open flow | Still required |
-| Intel and macOS 14 runtime | Still required |
+| Intel and macOS 14 runtime | CI covers synthetic adapter behavior; browser GUI still required |
 
-GUI automation selected the personal instance when bundle IDs matched. Routing
+Earlier GUI automation selected the personal instance when bundle IDs matched. Routing
 checks therefore used a copied Brave installation with a distinct bundle ID and
 ad-hoc signature. They verified address bars, profile labels and container badges,
 not cookie isolation. Forced termination of only the disposable process was needed
@@ -55,7 +55,7 @@ for cold checks; graceful session-restoration behavior remains unverified.
 
 Use a separate test data directory. Initialize two profiles in Brave. Enable
 Containers and create two disposable named containers through Brave's UI. Never
-edit preference files or close personal sessions for a test. Wait for `cbc list`
+edit preference files. Do not close personal sessions without explicit user approval. Wait for `cbc list`
 to reflect each edit.
 
 1. Download the release DMG through a browser on a second Mac. Verify the checksum,
