@@ -4,7 +4,8 @@ import Foundation
 
 @MainActor
 final class Receiver: NSObject, NSApplicationDelegate {
-    private var pending: [[String]] = []
+    private var pending = URLRequestQueue()
+    private var deferredError: AdapterError?
     private var draining = false
     private var showingError = false
 
@@ -18,56 +19,80 @@ final class Receiver: NSObject, NSApplicationDelegate {
         guard let direct = event.paramDescriptor(forKeyword: keyDirectObject) else {
             show(AdapterError("The sender did not include a URL.")); return
         }
-        if direct.descriptorType == typeAEList {
-            var strings: [String] = []
-            for index in 1...max(1, direct.numberOfItems) {
-                guard let value = direct.atIndex(index)?.stringValue else {
-                    show(AdapterError("The sender included an invalid URL list.")); return
+        do {
+            let descriptors: [NSAppleEventDescriptor]
+            if direct.descriptorType == typeAEList {
+                guard (1...URLBatch.maximumURLs).contains(direct.numberOfItems) else {
+                    throw AdapterError("Send between 1 and 128 URLs per request. This request was rejected.")
                 }
-                strings.append(value)
+                descriptors = try (1...direct.numberOfItems).map {
+                    guard let item = direct.atIndex($0) else { throw AdapterError("The sender included an invalid URL list.") }
+                    return item
+                }
+            } else { descriptors = [direct] }
+            var total = 0
+            let strings = try descriptors.map { descriptor in
+                // Bound native descriptor bytes before decoding potentially large strings.
+                let bytes = Int(AEGetDescDataSize(descriptor.aeDesc))
+                total += bytes
+                guard bytes <= URLBatch.maximumURLBytes * 2, total <= URLBatch.maximumBytes * 2,
+                      let value = descriptor.stringValue else {
+                    throw AdapterError("The URL event is invalid or too large. This request was rejected.")
+                }
+                return value
             }
-            enqueue(strings)
-        } else if let value = direct.stringValue { enqueue([value]) }
-        else { show(AdapterError("The sender included an invalid URL event.")) }
+            try enqueue(strings)
+        } catch {
+            reply.setParam(NSAppleEventDescriptor(int32: -10000), forKeyword: keyErrorNumber)
+            show(error as? AdapterError ?? AdapterError("The URL request was rejected."))
+        }
     }
 
     // Also accepts AppKit's batched URL delivery. The custom GURL handler above
     // consumes its own events; it does not forward them to AppKit a second time.
     func application(_ application: NSApplication, open urls: [URL]) {
-        enqueue(urls.map(\.absoluteString))
+        do {
+            guard urls.count <= URLBatch.maximumURLs else { throw AdapterError("Too many URLs in one request; this request was rejected.") }
+            try enqueue(urls.map(\.absoluteString))
+        } catch { show(error as? AdapterError ?? AdapterError("The URL request was rejected.")) }
     }
 
-    private func enqueue(_ strings: [String]) {
-        pending.append(strings)
+    private func enqueue(_ strings: [String]) throws {
+        try pending.enqueue(URLBatch(strings))
         drain()
     }
 
     private func drain() {
         guard !draining, !showingError else { return }
         draining = true
-        defer { draining = false }
-        while !pending.isEmpty {
-            let batch = pending.removeFirst()
-            do {
-                // Read configuration and metadata afresh for every received batch.
-                guard let resource = Bundle.main.resourceURL else { throw AdapterError("App resources are missing.") }
-                let config = try DestinationConfiguration.read(from: resource.appendingPathComponent("destination.json"))
-                _ = try BraveInstallation(paths: config.destination.paths)
-                let urls = try batch.map(WebURL.init)
-                let resolved = try Discovery(paths: config.destination.paths).resolve(config.destination)
-                let request = try LaunchRequest(resolved: resolved, urls: urls)
-                try BraveLauncher.launch(request) { error in
-                    Task { @MainActor [weak self] in self?.show(error) }
+        Task {
+            while !showingError, let batch = pending.next() {
+                do {
+                    guard let resource = Bundle.main.resourceURL else { throw AdapterError("App resources are missing.") }
+                    let request = try await Task.detached(priority: .userInitiated) {
+                        let config = try DestinationConfiguration.read(from: resource.appendingPathComponent("destination.json"))
+                        _ = try BraveInstallation(paths: config.destination.paths)
+                        let resolved = try Discovery(paths: config.destination.paths).resolve(config.destination)
+                        return try LaunchRequest(resolved: resolved, urls: batch.urls)
+                    }.value
+                    try BraveLauncher.launch(request) { error in
+                        Task { @MainActor [weak self] in self?.show(error) }
+                    }
+                } catch {
+                    show(error as? AdapterError ?? AdapterError("Destination resolution failed. Run cbc doctor."))
                 }
-            } catch {
-                show(error as? AdapterError ?? AdapterError("Destination resolution failed. Run cbc doctor."))
             }
+            draining = false
+            if !pending.isEmpty { drain() }
         }
     }
 
     private func show(_ error: AdapterError) {
         // Modal alerts run a nested event loop. Queue URLs received while visible.
-        guard !showingError else { return }
+        guard !showingError else {
+            deferredError = deferredError ?? error
+            return
+        }
         showingError = true
         let alert = NSAlert()
         alert.messageText = "Could not open Brave container"
@@ -77,7 +102,10 @@ final class Receiver: NSObject, NSApplicationDelegate {
         NSApplication.shared.activate(ignoringOtherApps: true)
         alert.runModal()
         showingError = false
-        drain()
+        if let next = deferredError {
+            deferredError = nil
+            Task { @MainActor in self.show(next) }
+        } else { drain() }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

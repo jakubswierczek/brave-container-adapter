@@ -11,6 +11,16 @@ Run the commands in [development](development.md). Swift Testing uses synthetic
 - URL preservation, unsupported schemes, argument budgets and argument arrays.
 - Temporary mode, version guards, legacy configuration and stable identity.
 - Standalone bundles, idempotent updates, name collisions, symlinks and icon imports.
+- Queue count/byte limits, FIFO, duplicate events and atomic batch rejection.
+- Bounded reads, oversized files, symlinks and special-file rejection.
+- Browser ownership, stale/foreign locks and safe activation selection.
+- Signing timeout/cancellation, failed swaps, rollback failures and retry recovery.
+- Real CLI parsing, safe diagnostics, generation/customization and read-only fixture hashes.
+
+`scripts/test.sh` runs Swift tests and the process-level CLI checks. CI runs tests
+and release builds on `macos-14`, `macos-15` and `macos-15-intel`; macOS 15 also
+packages both architectures. The `checks` job succeeds only if every matrix job passes.
+Runtime tests exercise synthetic adapter behavior; they do not launch Brave.
 
 Tests do not open Brave or use personal browser data. Packaging tests use a harmless
 system executable. Passing them does not certify browser routing.

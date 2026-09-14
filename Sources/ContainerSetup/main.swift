@@ -6,6 +6,10 @@ import UniformTypeIdentifiers
 @MainActor
 final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
     private var window: NSWindow!
+    private var controls: [NSControl] = []
+    private var enabledBeforeWork: [Bool] = []
+    private var operationTask: Task<Void, Never>?
+    private var isBusy = false
     private var paths = BravePaths.standard
     private var destinations: [ResolvedDestination] = []
     private let picker = NSPopUpButton()
@@ -100,7 +104,20 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         appMenu.addItem(withTitle: "Quit Brave Container Setup", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         menu.addItem(appItem)
+        let editItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = editMenu.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editItem.submenu = editMenu
+        menu.addItem(editItem)
         NSApplication.shared.mainMenu = menu
+        controls += [picker, appName, iconPicker, installButton]
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
@@ -110,60 +127,96 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
     private func button(_ title: String, _ action: Selector) -> NSButton {
         let button = NSButton(title: title, target: self, action: action)
         button.bezelStyle = .rounded
+        controls.append(button)
         return button
     }
 
-    @objc private func refresh() {
-        destinations = []
-        picker.removeAllItems()
-        location.stringValue = "Brave: \(paths.application)\nData: \(paths.userData)"
-        do {
-            let installation = try BraveInstallation(paths: paths)
-            let discovery = Discovery(paths: paths)
-            var unavailable = 0
-            var firstProblem: String?
-            for profile in try discovery.profiles() {
-                do {
-                    let snapshot = try discovery.containers(profileDirectory: profile.directory)
-                    guard snapshot.enabled else {
-                        unavailable += 1
-                        firstProblem = firstProblem ?? "Enable Containers and add or edit a container in Brave’s UI. Wait for the settings to save, then Refresh."
-                        continue
-                    }
-                    if installation.supportsTemporaryContainers {
-                        let temporary = try Destination(paths: paths, profileDirectory: profile.directory, selection: .temporary)
-                        destinations.append(try discovery.resolve(temporary))
-                    }
-                    if snapshot.configured == nil {
-                        unavailable += 1
-                        firstProblem = firstProblem ?? "Add or edit a named container in Brave’s UI, then Refresh."
-                    }
-                    for container in snapshot.configured ?? [] {
-                        let destination = try Destination(paths: paths, profileDirectory: profile.directory, containerID: container.id)
-                        destinations.append(try discovery.resolve(destination))
-                    }
-                } catch {
-                    unavailable += 1
-                    firstProblem = firstProblem ?? (error as? AdapterError)?.message ?? "Could not read this profile’s settings."
-                }
+    private func runOperation(_ label: String, action: @escaping @MainActor () async throws -> Void) {
+        guard !isBusy else { return }
+        isBusy = true
+        enabledBeforeWork = controls.map(\.isEnabled)
+        controls.forEach { $0.isEnabled = false }
+        installButton.isEnabled = true
+        installButton.title = "Cancel"
+        status.stringValue = label
+        operationTask = Task {
+            defer {
+                for (control, enabled) in zip(controls, enabledBeforeWork) { control.isEnabled = enabled }
+                isBusy = false
+                installButton.title = editingApp == nil ? "Install destination" : "Save app"
+                installButton.isEnabled = selectedDestination != nil
+                operationTask = nil
             }
-            picker.addItems(withTitles: destinations.map(\.displayName))
-            if destinations.isEmpty {
-                status.stringValue = "No ready destinations. " + (firstProblem ?? "No saved configured containers were found in the selected data folder.")
-            } else {
-                status.stringValue = "\(destinations.count) destinations ready." + (unavailable > 0 ? " Some profiles or containers are unavailable; check their saved settings in Brave." : "")
-            }
-        } catch {
-            status.stringValue = (error as? AdapterError)?.message ?? "Could not read Brave’s settings. Check the selected locations."
+            do { try await action() }
+            catch is CancellationError { status.stringValue = "Cancelled. Check installed apps before retrying." }
+            catch { status.stringValue = message(error) }
         }
-        selectionChanged()
+    }
+
+    @objc private func refresh() {
+        runOperation("Reading saved Brave settings…") {
+            self.destinations = []
+            self.picker.removeAllItems()
+            self.selectedDestination = nil
+            self.location.stringValue = "Brave: \(self.paths.application)\nData: \(self.paths.userData)"
+            let paths = self.paths
+            let result = try await BackgroundWork.run { try Self.scan(paths) }
+            try Task.checkCancellation()
+            self.destinations = result.0
+            self.picker.addItems(withTitles: self.destinations.map(\.displayName))
+            self.status.stringValue = result.1
+            try await self.selectDestination()
+        }
+    }
+
+    nonisolated private static func scan(_ paths: BravePaths) throws -> ([ResolvedDestination], String) {
+        let installation = try BraveInstallation(paths: paths)
+        let discovery = Discovery(paths: paths)
+        var ready: [ResolvedDestination] = []
+        var unavailable = 0
+        var firstProblem: String?
+        for profile in try discovery.profiles() {
+            do {
+                let snapshot = try discovery.containers(profileDirectory: profile.directory)
+                guard snapshot.enabled else {
+                    unavailable += 1
+                    firstProblem = firstProblem ?? "Enable Containers and save a container in Brave’s UI, then Refresh."
+                    continue
+                }
+                if installation.supportsTemporaryContainers {
+                    ready.append(try discovery.resolve(Destination(paths: paths, profileDirectory: profile.directory, selection: .temporary)))
+                }
+                if snapshot.configured == nil {
+                    unavailable += 1
+                    firstProblem = firstProblem ?? "Add or edit a named container in Brave’s UI, then Refresh."
+                }
+                for container in snapshot.configured ?? [] {
+                    ready.append(try discovery.resolve(Destination(paths: paths, profileDirectory: profile.directory, containerID: container.id)))
+                }
+            } catch is CancellationError { throw CancellationError() }
+            catch {
+                unavailable += 1
+                firstProblem = firstProblem ?? (error as? AdapterError)?.message ?? "Could not read this profile’s settings."
+            }
+        }
+        let status = ready.isEmpty
+            ? "No ready destinations. " + (firstProblem ?? "No saved configured containers were found.")
+            : "\(ready.count) destinations ready." + (unavailable > 0 ? " Some profiles or containers are unavailable; check their saved settings in Brave." : "")
+        return (ready, status)
     }
 
     @objc private func selectionChanged() {
+        runOperation("Loading destination…") { try await self.selectDestination() }
+    }
+
+    private func selectDestination() async throws {
         selectedDestination = nil
         editingApp = nil
         shortName = nil
         appName.stringValue = ""
+        customIcon = nil
+        iconPreview.image = nil
+        iconPicker.removeAllItems()
         installButton.isEnabled = false
         guard destinations.indices.contains(picker.indexOfSelectedItem) else { return }
         let resolved = destinations[picker.indexOfSelectedItem]
@@ -171,23 +224,31 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         shortName = "Brave — \(resolved.container.name)"
         do {
             if let existing = try AppGenerator.installedApp(for: resolved.destination) {
-                try loadAppearance(existing)
+                try await loadAppearance(existing)
             } else {
                 appName.stringValue = shortName ?? resolved.displayName
                 setIcon(.generated(resolved.destination.isTemporary ? .temporary : .monogram))
                 installButton.title = "Install destination"
                 installButton.isEnabled = true
             }
-        } catch { status.stringValue = message(error) }
+        } catch {
+            selectedDestination = nil
+            editingApp = nil
+            throw error
+        }
     }
 
-    private func loadAppearance(_ app: URL) throws {
+    private func loadAppearance(_ app: URL) async throws {
         let saved = try AppGenerator.readManagedApp(app)
         let icon = try AppGenerator.savedIcon(at: app)
+        let resolved = try? await BackgroundWork.run {
+            try Discovery(paths: saved.destination.paths).resolve(saved.destination)
+        }
+        try Task.checkCancellation()
         editingApp = app
         selectedDestination = saved.destination
         paths = saved.destination.paths
-        shortName = (try? Discovery(paths: paths).resolve(saved.destination)).map { "Brave — \($0.container.name)" }
+        shortName = resolved.map { "Brave — \($0.container.name)" }
         appName.stringValue = saved.displayName
         location.stringValue = "Profile: \(saved.destination.profileDirectory)\nApp: \(app.path)"
         setIcon(icon)
@@ -220,7 +281,7 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
     private func updatePreview() {
         guard let destination = selectedDestination else { iconPreview.image = nil; return }
         let config = DestinationConfiguration(destination: destination, displayName: appName.stringValue)
-        do { iconPreview.image = NSImage(data: try DestinationIcons.data(for: selectedIcon, configuration: config)) }
+        do { iconPreview.image = try DestinationIcons.preview(for: selectedIcon, configuration: config) }
         catch { status.stringValue = message(error) }
     }
 
@@ -252,13 +313,13 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         if panel.runModal() == .OK, let url = panel.url {
-            do {
-                try loadAppearance(url)
-                destinations = []
-                picker.removeAllItems()
-                picker.addItem(withTitle: "Installed app · \(selectedDestination?.profileDirectory ?? "")")
-                status.stringValue = "Edit the app name or icon, then Save app. Routing stays unchanged."
-            } catch { status.stringValue = message(error) }
+            runOperation("Reading installed app…") {
+                try await self.loadAppearance(url)
+                self.destinations = []
+                self.picker.removeAllItems()
+                self.picker.addItem(withTitle: "Installed app · \(self.selectedDestination?.profileDirectory ?? "")")
+                self.status.stringValue = "Edit the app name or icon, then Save app. Routing stays unchanged."
+            }
         }
     }
 
@@ -267,25 +328,31 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
     }
 
     @objc private func install() {
+        if isBusy { operationTask?.cancel(); status.stringValue = "Cancelling…"; return }
         guard let destination = selectedDestination else { return }
-        do {
-            if editingApp == nil {
-                _ = try BraveInstallation(paths: destination.paths)
-                _ = try Discovery(paths: destination.paths).resolve(destination)
+        let configuration = DestinationConfiguration(destination: destination,
+            displayName: appName.stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
+        let directory = editingApp?.deletingLastPathComponent() ?? AppGenerator.installDirectory
+        let icon = selectedIcon
+        let needsValidation = editingApp == nil
+        runOperation("Saving destination app…") {
+            if needsValidation {
+                try await BackgroundWork.run {
+                    _ = try BraveInstallation(paths: destination.paths)
+                    _ = try Discovery(paths: destination.paths).resolve(destination)
+                }
             }
+            try Task.checkCancellation()
             guard let receiver = Bundle.main.resourceURL?.appendingPathComponent("ContainerReceiver") else {
                 throw AdapterError("Setup resources are missing. Reinstall the complete setup app from its disk image.")
             }
-            let configuration = DestinationConfiguration(destination: destination,
-                displayName: appName.stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
-            let app = try AppGenerator.generate(configuration: configuration, receiver: receiver,
-                directory: editingApp?.deletingLastPathComponent() ?? AppGenerator.installDirectory,
-                icon: selectedIcon, rename: true)
-            try AppGenerator.register(app)
-            try loadAppearance(app)
-            status.stringValue = "Saved \(configuration.displayName). Add it to your browser switcher. If its name or icon is cached, remove the old entry and add this app again."
+            let app = try await AppGenerator.generate(configuration: configuration, receiver: receiver,
+                directory: directory, icon: icon, rename: true)
+            try await AppGenerator.register(app)
+            try await self.loadAppearance(app)
+            self.status.stringValue = "Saved \(configuration.displayName). Add it to your browser switcher. If its name or icon is cached, remove the old entry and add this app again."
             NSWorkspace.shared.activateFileViewerSelecting([app])
-        } catch { status.stringValue = message(error) }
+        }
     }
 
     @objc private func showInstalled() {
@@ -322,6 +389,11 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
     }
 
     @objc private func resetLocations() { paths = .standard; refresh() }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if isBusy { operationTask?.cancel(); return .terminateCancel }
+        return .terminateNow
+    }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 }

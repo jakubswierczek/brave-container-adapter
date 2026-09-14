@@ -8,7 +8,7 @@ public struct BraveInstallation: Sendable {
 
     public init(paths: BravePaths) throws {
         let plistURL = URL(fileURLWithPath: paths.application).appendingPathComponent("Contents/Info.plist")
-        guard let data = try? Data(contentsOf: plistURL),
+        guard let data = try? BoundedFile.read(at: plistURL, limit: FileReadLimit.configuration),
               let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
               plist["CFBundleExecutable"] as? String == "Brave Browser",
               let version = plist["CFBundleShortVersionString"] as? String,
@@ -38,8 +38,10 @@ public struct BraveInstallation: Sendable {
 public struct WebURL: Equatable, Sendable {
     public let original: String
     public init(_ raw: String) throws {
+        let forbiddenCharacters = CharacterSet.whitespacesAndNewlines.union(.controlCharacters)
         guard !raw.isEmpty,
-              !raw.unicodeScalars.contains(where: { CharacterSet.whitespacesAndNewlines.union(.controlCharacters).contains($0) }),
+              raw.utf8.count <= URLBatch.maximumURLBytes,
+              !raw.unicodeScalars.contains(where: { forbiddenCharacters.contains($0) }),
               let parsed = URLComponents(string: raw),
               ["http", "https"].contains(parsed.scheme?.lowercased() ?? ""),
               let host = parsed.host, !host.isEmpty, parsed.url != nil else {
@@ -78,17 +80,15 @@ public struct LaunchRequest: Sendable {
 }
 
 public enum BraveLauncher {
+    @MainActor private static var activationTask: Task<Void, Never>?
     /// Successful process creation is not proof that Brave used the container.
     /// A cold browser process remains alive; never wait for it on the UI thread.
     @MainActor
     @discardableResult
     public static func launch(_ request: LaunchRequest,
                               onFailure: @escaping @Sendable (AdapterError) -> Void = { _ in }) throws -> Process {
-        if let owner = singletonOwner(userData: request.userData),
-           let app = NSRunningApplication(processIdentifier: owner),
-           app.executableURL?.resolvingSymlinksInPath() != request.executable.resolvingSymlinksInPath() {
-            throw AdapterError("This user data directory is open in a different browser installation. Close that test or browser instance before using this destination.")
-        }
+        let probe = BrowserOwnershipProbe()
+        try probe.inspect(userData: request.userData).validate(executable: request.executable)
         let process = Process()
         process.executableURL = request.executable
         process.arguments = request.arguments
@@ -102,23 +102,22 @@ public enum BraveLauncher {
         }
         do { try process.run() }
         catch { throw AdapterError("Could not start Brave. Check installation permissions and run cbc doctor. URL contents are omitted.") }
-        Task { @MainActor in
-            for delay in [200, 600, 1200] {
+        activationTask?.cancel()
+        activationTask = Task { @MainActor in
+            for delay in [200, 400, 800, 1600, 2000, 2000, 2000] {
                 try? await Task.sleep(for: .milliseconds(delay))
-                let owner = singletonOwner(userData: request.userData)
-                if let app = NSRunningApplication(processIdentifier: owner ?? process.processIdentifier),
+                guard !Task.isCancelled else { return }
+                let owner = probe.inspect(userData: request.userData)
+                if let pid = owner.activationCandidate(executable: request.executable, launched: probe.process(process.processIdentifier)),
+                   let app = NSRunningApplication(processIdentifier: pid),
                    app.executableURL?.resolvingSymlinksInPath() == request.executable.resolvingSymlinksInPath() {
                     app.activate(options: [])
-                    if app.isActive { break }
+                    if app.isActive { return }
                 }
             }
+            onFailure(AdapterError("Brave was started, but its foreground window could not be confirmed. Check its profile and container badge before retrying the link."))
         }
         return process
     }
 
-    private static func singletonOwner(userData: String) -> pid_t? {
-        let lock = URL(fileURLWithPath: userData).appendingPathComponent("SingletonLock").path
-        let target = try? FileManager.default.destinationOfSymbolicLink(atPath: lock)
-        return target?.split(separator: "-").last.flatMap { Int32($0) }
-    }
 }

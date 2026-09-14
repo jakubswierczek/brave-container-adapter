@@ -44,8 +44,9 @@ func unsupportedAndMalformedURLsAreRejected(_ raw: String) {
     let f = try Fixture()
     let resolved = try f.discovery.resolve(f.destination)
     #expect(throws: AdapterError.self) { try LaunchRequest(resolved: resolved, urls: []) }
-    let url = try WebURL("https://example.com/?q=" + String(repeating: "x", count: 131072))
-    #expect(throws: AdapterError.self) { try LaunchRequest(resolved: resolved, urls: [url]) }
+    #expect(throws: AdapterError.self) { try WebURL("https://example.com/?q=" + String(repeating: "x", count: 131072)) }
+    let url = try WebURL("https://example.com/?q=" + String(repeating: "x", count: 60000))
+    #expect(throws: AdapterError.self) { try LaunchRequest(resolved: resolved, urls: [url, url, url]) }
 }
 
 @Test @MainActor func launchFailureDoesNotIncludeIncomingURL() throws {

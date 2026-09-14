@@ -20,6 +20,6 @@ Imported images are rasterized into a self-contained ICNS file with transparent
 padding and no source path. Users must have permission to use their chosen artwork.
 No imported user artwork is part of this repository.
 
-Before opening the repository, confirm source-artwork provenance and the license
-that applies to project-owned assets. This file records origin; it does not grant a
-license or claim ownership of third-party marks. See [the audit](../docs/public-readiness.md).
+The owner confirmed publication rights for code and project-owned artwork on
+2026-09-14. Project-owned artwork is covered by the [MIT license](../LICENSE).
+This grant does not include third-party trademarks or user-imported images.

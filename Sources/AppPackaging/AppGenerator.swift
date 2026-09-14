@@ -4,6 +4,14 @@ import Darwin
 import Foundation
 
 @MainActor
+struct GenerationServices {
+    var runTool: (ToolInvocation) async throws -> Void = ToolRunner.run
+    var rename: (URL, URL, UInt32) -> Int32 = { source, target, flags in
+        renameatx_np(AT_FDCWD, source.path, AT_FDCWD, target.path, flags)
+    }
+}
+
+@MainActor
 public enum AppGenerator {
     public static var installDirectory: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/Brave Destinations")
@@ -12,7 +20,8 @@ public enum AppGenerator {
     public static func readManagedApp(_ app: URL) throws -> DestinationConfiguration {
         guard app.pathExtension.lowercased() == "app",
               try app.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true,
-              let info = NSDictionary(contentsOf: app.appendingPathComponent("Contents/Info.plist")),
+              let bytes = try? BoundedFile.read(at: app.appendingPathComponent("Contents/Info.plist"), limit: FileReadLimit.configuration),
+              let info = try? PropertyListSerialization.propertyList(from: bytes, format: nil) as? [String: Any],
               info["CBCManagedBundle"] as? Bool == true else {
             throw AdapterError("Choose a destination app created by this utility, not a browser or another application.")
         }
@@ -39,22 +48,28 @@ public enum AppGenerator {
     private static func matchingApps(destination: Destination, directory: URL) throws -> [URL] {
         guard FileManager.default.fileExists(atPath: directory.path) else { return [] }
         return try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isSymbolicLinkKey])
-            .filter { app in (try? readManagedApp(app).destination) == destination }
+            .filter { app in !app.lastPathComponent.hasPrefix(".") && (try? readManagedApp(app).destination) == destination }
     }
 
     public static func savedIcon(at app: URL) throws -> AppIcon {
         _ = try readManagedApp(app)
         let resources = app.appendingPathComponent("Contents/Resources")
-        if let data = try? Data(contentsOf: resources.appendingPathComponent("appearance.json")),
+        if let data = try? BoundedFile.read(at: resources.appendingPathComponent("appearance.json"), limit: FileReadLimit.configuration),
            let saved = try? JSONDecoder().decode([String: String].self, from: data),
            let raw = saved["iconPreset"], let preset = IconPreset(rawValue: raw) {
             return .generated(preset)
         }
-        return .custom(try Data(contentsOf: resources.appendingPathComponent("Destination.icns")))
+        return .custom(try BoundedFile.read(at: resources.appendingPathComponent("Destination.icns"), limit: FileReadLimit.icon))
     }
 
     public static func generate(configuration: DestinationConfiguration, receiver: URL, directory: URL,
-                                icon: AppIcon? = nil, rename: Bool = false) throws -> URL {
+                                icon: AppIcon? = nil, rename: Bool = false) async throws -> URL {
+        try await generate(configuration: configuration, receiver: receiver, directory: directory,
+                           icon: icon, rename: rename, services: GenerationServices())
+    }
+
+    static func generate(configuration: DestinationConfiguration, receiver: URL, directory: URL,
+                         icon: AppIcon? = nil, rename: Bool = false, services: GenerationServices) async throws -> URL {
         let fm = FileManager.default
         guard !configuration.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !configuration.displayName.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }),
@@ -71,9 +86,13 @@ public enum AppGenerator {
             throw AdapterError("Apps cannot be generated inside Brave's user data directory.")
         }
         try fm.createDirectory(at: directory, withIntermediateDirectories: true)
-        let lock = Darwin.open(directory.appendingPathComponent(".cbc-install.lock").path, O_CREAT | O_RDWR | O_NOFOLLOW, 0o600)
+        let lock = Darwin.open(directory.appendingPathComponent(".cbc-install.lock").path, O_CREAT | O_RDWR | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC, 0o600)
         guard lock >= 0 else { throw AdapterError("Cannot lock the destination directory.") }
         defer { Darwin.close(lock) }
+        var lockInfo = stat()
+        guard fstat(lock, &lockInfo) == 0, lockInfo.st_mode & S_IFMT == S_IFREG else {
+            throw AdapterError("The destination directory lock is not a regular file.")
+        }
         guard flock(lock, LOCK_EX | LOCK_NB) == 0 else { throw AdapterError("Another generation is running in this directory.") }
         let id = configuration.destination.bundleIdentifier
         let owned = try matchingApps(destination: configuration.destination, directory: directory)
@@ -131,19 +150,20 @@ public enum AppGenerator {
         case .custom: preset = "custom"
         }
         try encoder.encode(["iconPreset": preset]).write(to: resources.appendingPathComponent("appearance.json"))
-        try runTool("/usr/bin/codesign", ["--force", "--sign", "-", staging.path], failure: "Could not ad-hoc sign the app.")
-        try runTool("/usr/bin/codesign", ["--verify", "--strict", staging.path], failure: "Generated app signature verification failed.")
+        try await services.runTool(ToolInvocation(executable: "/usr/bin/codesign", arguments: ["--force", "--sign", "-", staging.path], failure: "Could not ad-hoc sign the app."))
+        try await services.runTool(ToolInvocation(executable: "/usr/bin/codesign", arguments: ["--verify", "--strict", staging.path], failure: "Generated app signature verification failed."))
+        try Task.checkCancellation()
         let previous = owned.first
         let moving = previous.map { BravePaths.canonical($0.path) != BravePaths.canonical(target.path) } ?? false
         if moving, let previous {
-            guard renameatx_np(AT_FDCWD, previous.path, AT_FDCWD, target.path, UInt32(RENAME_EXCL)) == 0 else {
+            guard services.rename(previous, target, UInt32(RENAME_EXCL)) == 0 else {
                 throw AdapterError("Could not rename the app. Check for a filename collision or missing permissions; existing app was preserved.")
             }
         }
         let flags = previous != nil ? UInt32(RENAME_SWAP) : UInt32(RENAME_EXCL)
-        guard renameatx_np(AT_FDCWD, staging.path, AT_FDCWD, target.path, flags) == 0 else {
+        guard services.rename(staging, target, flags) == 0 else {
             if moving, let previous,
-               renameatx_np(AT_FDCWD, target.path, AT_FDCWD, previous.path, UInt32(RENAME_EXCL)) != 0 {
+               services.rename(target, previous, UInt32(RENAME_EXCL)) != 0 {
                 throw AdapterError("Update failed. The original app is intact under the requested new filename; inspect it in Finder before retrying.")
             }
             throw AdapterError("Could not atomically install the app. Existing apps were preserved.")
@@ -152,20 +172,13 @@ public enum AppGenerator {
         return URL(fileURLWithPath: BravePaths.canonical(target.path), isDirectory: true)
     }
 
-    public static func register(_ app: URL) throws {
-        try runTool("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
+    public static func register(_ app: URL) async throws {
+        try await runTool("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
                     ["-f", app.path], failure: "App was installed, but Launch Services registration failed. Open the app once in Finder.")
     }
 
-    private static func runTool(_ executable: String, _ arguments: [String], failure: String) throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        do { try process.run(); process.waitUntilExit() }
-        catch { throw AdapterError(failure) }
-        guard process.terminationStatus == 0 else { throw AdapterError(failure) }
+    private static func runTool(_ executable: String, _ arguments: [String], failure: String) async throws {
+        try await ToolRunner.run(ToolInvocation(executable: executable, arguments: arguments, failure: failure))
     }
 
 }

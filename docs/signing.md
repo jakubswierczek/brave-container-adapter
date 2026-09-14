@@ -27,7 +27,7 @@ Apple lists **Account Holder** as the role required to create a Developer ID cer
 
 ## Build and notarize
 
-Run checks from a clean source commit first. The release version and build number
+Run checks from a clean source commit first. The signing script rejects uncommitted changes. Setup includes a public-safe `build-info.json` with its source commit, toolchain and dependency inventory. The release version and build number
 come from `Sources/BraveDestinations/ReleaseVersion.swift`.
 
 ```bash

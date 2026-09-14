@@ -7,23 +7,20 @@ public struct PreferenceReader: Sendable {
     init(waitBeforeRetry: @escaping @Sendable () -> Void) { self.waitBeforeRetry = waitBeforeRetry }
 
     public func read<T: Decodable>(_ type: T.Type, at url: URL) throws -> T {
+        var readFailure: AdapterError?
         for attempt in 0..<3 {
             do {
-                let before = try FileManager.default.attributesOfItem(atPath: url.path)
-                let data = try Data(contentsOf: url)
+                let data = try BoundedFile.read(at: url, limit: FileReadLimit.metadata)
                 let decoded = try JSONDecoder().decode(type, from: data)
-                let after = try FileManager.default.attributesOfItem(atPath: url.path)
-                guard [.size, .modificationDate, .systemFileNumber].allSatisfy({ key in
-                    String(describing: before[key]) == String(describing: after[key])
-                }) else {
-                    throw AdapterError("Metadata changed during reading.")
-                }
                 return decoded
-            } catch {
+            } catch is CancellationError { throw CancellationError() }
+            catch {
+                readFailure = error as? AdapterError
                 if attempt < 2 { waitBeforeRetry() }
             }
         }
-        throw AdapterError("Cannot read valid \(url.lastPathComponent) metadata. It is missing, unreadable, malformed, or changing. Wait for Brave to save, then retry.")
+        throw AdapterError("Cannot read valid \(url.lastPathComponent) metadata. " +
+            (readFailure?.message ?? "It is missing, unreadable, malformed, or changing. Wait for Brave to save, then retry."))
     }
 }
 

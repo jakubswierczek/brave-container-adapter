@@ -121,12 +121,12 @@ func temporaryRejectsMalformedOrUnsavedPreferences(_ contents: String) throws {
     #expect(throws: AdapterError.self) { try f.discovery.resolve(f.temporary) }
 }
 
-@Test @MainActor func temporaryBundleStoresModeWithoutEphemeralIDAndUpdatesInPlace() throws {
+@Test @MainActor func temporaryBundleStoresModeWithoutEphemeralIDAndUpdatesInPlace() async throws {
     let f = try Fixture()
     let config = try DestinationConfiguration(destination: f.temporary, displayName: "Brave — Temporary")
     let output = f.root.appendingPathComponent("Generated")
     let receiver = URL(fileURLWithPath: "/usr/bin/true")
-    let app = try AppGenerator.generate(configuration: config, receiver: receiver, directory: output)
+    let app = try await AppGenerator.generate(configuration: config, receiver: receiver, directory: output)
     let file = app.appendingPathComponent("Contents/Resources/destination.json")
     #expect(try DestinationConfiguration.read(from: file) == config)
     var json = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as! [String: Any]
@@ -134,7 +134,7 @@ func temporaryRejectsMalformedOrUnsavedPreferences(_ contents: String) throws {
     #expect(json["formatVersion"] as? Int == 2)
     #expect(destination["mode"] as? String == "temporary")
     #expect(destination["containerID"] == nil)
-    #expect(try AppGenerator.generate(configuration: config, receiver: receiver, directory: output) == app)
+    #expect(try await AppGenerator.generate(configuration: config, receiver: receiver, directory: output) == app)
     json["formatVersion"] = 1
     try JSONSerialization.data(withJSONObject: json).write(to: file)
     #expect(throws: AdapterError.self) { try DestinationConfiguration.read(from: file) }

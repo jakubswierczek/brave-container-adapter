@@ -39,11 +39,8 @@ public enum AppIcon: Sendable {
 @MainActor
 public enum DestinationIcons {
     public static func importImage(at url: URL) throws -> AppIcon {
-        let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-        guard size > 0, size <= 32 * 1024 * 1024 else {
-            throw AdapterError("Choose an image smaller than 32 MB.")
-        }
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
+        let data = try BoundedFile.read(at: url.resolvingSymlinksInPath(), limit: FileReadLimit.icon)
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
             throw AdapterError("Cannot read this image. Choose a PNG, JPEG, HEIC, TIFF, or ICNS file.")
         }
         let count = CGImageSourceGetCount(source)
@@ -67,6 +64,17 @@ public enum DestinationIcons {
     }
 
     public static func data(for icon: AppIcon, configuration: DestinationConfiguration) throws -> Data {
+        try render(icon: icon, configuration: configuration, sizes: [(32, "icp5"), (64, "icp6"), (128, "ic07"), (256, "ic08"), (512, "ic09"), (1024, "ic10")])
+    }
+
+    public static func preview(for icon: AppIcon, configuration: DestinationConfiguration) throws -> NSImage {
+        // The 72-point UI needs one small representation, not a full 1024-pixel ICNS.
+        let data = try render(icon: icon, configuration: configuration, sizes: [(256, "ic08")])
+        guard let image = NSImage(data: data) else { throw AdapterError("Could not render the icon preview.") }
+        return image
+    }
+
+    private static func render(icon: AppIcon, configuration: DestinationConfiguration, sizes: [(Int, String)]) throws -> Data {
         switch icon {
         case .custom(let data):
             guard data.count <= 32 * 1024 * 1024, data.starts(with: Data("icns".utf8)), NSImage(data: data) != nil else {
@@ -74,7 +82,7 @@ public enum DestinationIcons {
             }
             return data
         case .generated(let preset):
-            return try encode { rect in
+            return try encode(sizes: sizes) { rect in
                 let s = rect.width
                 let seed = CGFloat(Int(configuration.destination.bundleIdentifier.suffix(6), radix: 16) ?? 0) / CGFloat(0xffffff)
                 let hue = preset.hue ?? seed
@@ -101,9 +109,9 @@ public enum DestinationIcons {
         return (props?[kCGImagePropertyPixelWidth] as? Int ?? 0, props?[kCGImagePropertyPixelHeight] as? Int ?? 0)
     }
 
-    private static func encode(draw: (NSRect) -> Void) throws -> Data {
+    private static func encode(sizes: [(Int, String)] = [(32, "icp5"), (64, "icp6"), (128, "ic07"), (256, "ic08"), (512, "ic09"), (1024, "ic10")], draw: (NSRect) -> Void) throws -> Data {
         var chunks = Data()
-        for (size, type) in [(32, "icp5"), (64, "icp6"), (128, "ic07"), (256, "ic08"), (512, "ic09"), (1024, "ic10")] {
+        for (size, type) in sizes {
             guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size,
                 bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
                 colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),

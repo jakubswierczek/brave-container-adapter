@@ -13,6 +13,10 @@ if [[ $# != 2 || ! "$1" =~ ^[[:xdigit:]]{40}$ || -z "$2" ]]; then
 fi
 identity="$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')"
 profile="$2"
+if [[ -n "$(git status --porcelain)" ]]; then
+  echo 'Commit the reviewed source before signing a release.' >&2
+  exit 1
+fi
 if ! security find-identity -v -p codesigning | grep -E "[[:space:]]$identity \"Developer ID Application: " > /dev/null; then
   echo 'No matching valid Developer ID Application identity. Install the certificate and private key first.' >&2
   exit 1
@@ -24,6 +28,7 @@ fi
 xcrun notarytool history --keychain-profile "$profile" --output-format json > /dev/null
 
 # Keep each attempt separate, including rejected/timed-out submission evidence.
+mkdir -p dist
 attempt="$(mktemp -d "$PWD/dist/notarization.XXXXXX")"
 echo "Signing attempt: $attempt"
 scripts/package-setup.sh --app-only "$attempt"

@@ -29,6 +29,28 @@ private struct Options {
             values[key] = arguments[index + 1]
             index += 2
         }
+        let pathOptions: Set<String> = ["--brave", "--user-data-dir", "--profile"]
+        let appearance: Set<String> = ["--name", "--icon", "--icon-file", "--receiver"]
+        let allowed: Set<String>
+        switch command {
+        case "help", "--help", "-h", "version", "--version": allowed = []
+        case "list": allowed = pathOptions
+        case "doctor": allowed = pathOptions.union(["--container-id", "--app"])
+        case "generate": allowed = pathOptions.union(appearance).union(["--container-id", "--output"])
+        case "install": allowed = pathOptions.union(appearance).union(["--container-id"])
+        case "customize": allowed = appearance.union(["--app"])
+        default: throw AdapterError("Unknown command. Run cbc help.")
+        }
+        guard Set(values.keys).isSubset(of: allowed), !all || command == "install",
+              !temporary || ["doctor", "generate", "install"].contains(command) else {
+            throw AdapterError("An option is not valid for this command. Run cbc help.")
+        }
+        guard !all || (values["--name"] == nil && values["--container-id"] == nil && !temporary) else {
+            throw AdapterError("--all cannot be combined with --name, --container-id, or --temporary.")
+        }
+        guard values["--app"] == nil || command != "doctor" || values.count == 1 else {
+            throw AdapterError("doctor --app uses the app's saved destination; do not combine it with path or profile options.")
+        }
     }
 
     var paths: BravePaths {
@@ -40,7 +62,7 @@ private struct Options {
 private func sayError(_ message: String) { FileHandle.standardError.write(Data((message + "\n").utf8)) }
 
 @MainActor
-private func run() throws {
+private func run() async throws {
     let options = try Options(Array(CommandLine.arguments.dropFirst()))
     if ["version", "--version"].contains(options.command) {
         print("\(ReleaseVersion.version) \(ReleaseVersion.build)")
@@ -94,9 +116,9 @@ private func run() throws {
         let app = URL(fileURLWithPath: path).standardizedFileURL
         let saved = try AppGenerator.readManagedApp(app)
         let config = DestinationConfiguration(destination: saved.destination, displayName: options.values["--name"] ?? saved.displayName)
-        let updated = try AppGenerator.generate(configuration: config, receiver: receiver,
+        let updated = try await AppGenerator.generate(configuration: config, receiver: receiver,
             directory: app.deletingLastPathComponent(), icon: icon, rename: options.values["--name"] != nil)
-        try AppGenerator.register(updated)
+        try await AppGenerator.register(updated)
         print(updated.path)
         return
     }
@@ -162,6 +184,13 @@ private func run() throws {
         }
         let handler = NSWorkspace.shared.urlForApplication(toOpen: URL(string: "https://example.com")!)
         print("HTTPS default: \(handler?.deletingPathExtension().lastPathComponent ?? "unavailable") (unchanged)")
+        let owner = BrowserOwnershipProbe().inspect(userData: paths.userData)
+        try owner.validate(executable: paths.executable)
+        switch owner {
+        case .available: print("Data directory: no live local singleton owner")
+        case .running: print("Data directory: owned by the selected Brave executable")
+        case .unknown: break // validate above reports a safe diagnostic.
+        }
         print("Inspection is read-only. GUI container selection is not confirmed by doctor.")
         print("Named routing baseline: Brave 1.92.140. Temporary routing requires 1.95.101+. Verify routing after Brave updates.")
         if try discovery.explicitlyDisabledFeature() { throw AdapterError("Containers feature is explicitly disabled in brave://flags.") }
@@ -204,12 +233,12 @@ private func run() throws {
         let saved = try existing.map { try AppGenerator.readManagedApp($0) }
         let configuration = DestinationConfiguration(destination: resolved.destination,
             displayName: options.values["--name"] ?? saved?.displayName ?? resolved.displayName)
-        let app = try AppGenerator.generate(configuration: configuration, receiver: receiver,
+        let app = try await AppGenerator.generate(configuration: configuration, receiver: receiver,
             directory: existing?.deletingLastPathComponent() ?? output, icon: icon, rename: options.values["--name"] != nil)
-        if options.command == "install" { try AppGenerator.register(app) }
+        if options.command == "install" { try await AppGenerator.register(app) }
         print(app.path)
     }
 }
 
-do { try run() }
+do { try await run() }
 catch { sayError((error as? AdapterError)?.message ?? "Operation failed. Check paths, permissions, and cbc help."); exit(1) }

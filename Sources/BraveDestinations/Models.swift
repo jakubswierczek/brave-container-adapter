@@ -119,7 +119,7 @@ public struct DestinationConfiguration: Codable, Equatable, Sendable {
 
     public static func read(from url: URL) throws -> Self {
         do {
-            let value = try JSONDecoder().decode(Self.self, from: Data(contentsOf: url))
+            let value = try JSONDecoder().decode(Self.self, from: BoundedFile.read(at: url, limit: FileReadLimit.configuration))
             guard [1, 2].contains(value.formatVersion),
                   value.formatVersion != 1 || !value.destination.isTemporary else {
                 throw AdapterError("Unsupported app configuration version.")

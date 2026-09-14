@@ -28,7 +28,7 @@ scripts/build.sh
 scripts/package-setup.sh
 ```
 
-`check-repo.py` validates documentation links, the instruction symlink, shell syntax, and tracked-file hygiene. The macOS CI workflow runs these checks plus tests, release build and local DMG packaging. It uses read-only repository permissions, a pinned checkout action, and no signing secrets.
+`check-repo.py` validates documentation links, the instruction symlink, shell syntax, and tracked-file hygiene. The macOS CI workflow runs these checks plus tests, release build and local DMG packaging. It uses read-only repository permissions, a pinned checkout action, and no signing secrets. The aggregate `checks` job is the required branch check. See [maintenance](maintenance.md) for runner retirement and release policy.
 
 The package has no third-party Swift dependencies. Runtime APIs require macOS 14. Minimum deployment target is not proof of runtime compatibility; see [testing](testing.md).
 
@@ -41,3 +41,5 @@ The package has no third-party Swift dependencies. Runtime APIs require macOS 14
 `scripts/create-dmg.sh SETUP_APP OUTPUT.dmg` packages a verified setup app, an Applications shortcut and installation text. It stages the disk image before replacing an existing output. The app's existing signature and ticket are preserved. See [release signing](signing.md) for distribution.
 
 Keep tests synthetic. GUI checks must use disposable profiles and neutral URLs. Do not write Brave preferences or use personal sessions as fixtures. See [CONTRIBUTING.md](../CONTRIBUTING.md).
+
+Each setup bundle includes `Contents/Resources/build-info.json`: source commit/tree, dirty-state flag, Xcode/Swift versions, build OS, architectures and dependency inventory. It excludes local paths and credentials. Signed release builds require a clean working tree. Signatures, timestamps and notarization tickets prevent a byte-reproducibility claim.

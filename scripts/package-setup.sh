@@ -29,6 +29,8 @@ strip -S "$app/Contents/Resources/ContainerReceiver"
 cp README.md "$app/Contents/Resources/README.md"
 cp AGENTS.md CONTRIBUTING.md SECURITY.md "$app/Contents/Resources/"
 cp -R docs "$app/Contents/Resources/docs"
+scripts/build-info.py "$app/Contents/Resources/build-info.json"
+if [[ -f LICENSE ]]; then cp LICENSE "$app/Contents/Resources/"; fi
 mkdir -p "$app/Contents/Resources/assets"
 cp assets/*.md "$app/Contents/Resources/assets/"
 iconset="$stage/SetupIcon.iconset"

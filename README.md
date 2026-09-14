@@ -35,7 +35,7 @@ Only links sent to a generated app pass through the adapter. Normal navigation i
 - [Testing](docs/testing.md): automated coverage and manual verification.
 - [Signing and releases](docs/signing.md): Developer ID, notarization and release checks.
 - [Public-readiness audit](docs/public-readiness.md): findings and the publication checklist.
-- [Contributing](CONTRIBUTING.md) and [security reporting](SECURITY.md).
+- [Maintenance](docs/maintenance.md), [contributing](CONTRIBUTING.md) and [security reporting](SECURITY.md).
 
 ## Build from source
 
@@ -48,4 +48,4 @@ dist/bin/cbc list
 dist/bin/cbc install --profile Default --temporary
 ```
 
-This is an independent utility, not an official Brave product. The repository remains private while public-release work is completed. No open-source license has been selected yet.
+This is an independent utility, not an official Brave product. Code, documentation and project-owned artwork use the [MIT license](LICENSE). No rights to third-party trademarks are granted. The repository remains private while release checks are completed.

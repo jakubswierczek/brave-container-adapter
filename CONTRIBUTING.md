@@ -1,8 +1,9 @@
 # Contributing
 
 Read the [development guide](docs/development.md) and [repository instructions](AGENTS.md).
-The repository is private and has no open-source license yet. Public contribution
-terms must be settled before it is opened; do not assume a license grant.
+Code, documentation and project-owned artwork use the [MIT license](LICENSE).
+Contributions are offered under the same terms. Submit only material you have the
+right to contribute; do not include employer or third-party material without permission.
 
 Keep changes focused. Explain the problem, changed behavior, checks performed and
 remaining limitations. Use synthetic fixtures. Never attach browser preferences,

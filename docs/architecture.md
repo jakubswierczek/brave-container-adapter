@@ -64,10 +64,20 @@ Only configured entries become named destinations. Temporary mode creates a fres
 Brave may show its built-in Personal/Work/Social/School containers while `list` is absent from the file. These are localized runtime defaults, not evidence that `used` is the configured list. **Add a container or edit and save one in Brave's UI**, then wait until `cbc list` shows the configured entries. The adapter does not guess localized names or synthesize default records. Temporary mode does not need a saved `list`. Both modes require explicit saved `enabled: true`, even if a Brave experiment enables the UI by default.
 
 Brave writes preferences asynchronously. `cbc list` shows the saved state, which can lag the UI. After changing container settings, wait for the new state to appear before opening links. Close/reopen the test browser if a save does not appear. The reader retries failed, partial, or changing file reads three times; it never writes these files.
+Preference files are limited to 16 MiB, configuration/plist files to 1 MiB, and icon
+files to 32 MiB. Reads reject non-regular files and final-component symlinks, enforce
+limits while reading, and check inode, timestamps and size before and after the read.
+These bounds limit memory use; they are not a wall-clock guarantee for a stalled filesystem.
 
 ## URL delivery and errors
 
-The app declares HTTP/HTTPS URL handling and runs as an AppKit accessory app. It has no normal window or persistent Dock icon. It stays resident until quit/logout so an idle timeout cannot discard a late URL event. Multiple events and batched URLs are supported; repeated URLs are not deduplicated. Incoming events received during an error alert are queued.
+The app declares HTTP/HTTPS URL handling and runs as an AppKit accessory app. It has no normal window or persistent Dock icon. It stays resident until quit/logout so an idle timeout cannot discard a late URL event. Multiple events and batched URLs are supported; repeated URLs are not deduplicated. Incoming events received during an error alert are queued within the limits below.
+
+Requests accept at most 128 URLs, 64 KiB per URL and 128 KiB of URL text per batch.
+The pending queue holds at most 32 batches and 1 MiB of URL text. An overflow rejects
+the new batch, preserves previously accepted batches and shows a bounded error alert.
+A native URL-event sender also receives an Apple-event error. Accepted duplicates
+remain distinct requests. Only one destination-resolution task drains the queue.
 
 The receiver validates the entire incoming batch, loads its destination, and reads the latest saved preferences. For a named destination, it resolves the configured ID to its current name and constructs:
 
@@ -82,7 +92,7 @@ The receiver validates the entire incoming batch, loads its destination, and rea
 
 For Temporary, `--temporary-container` replaces `--container=Current Name`. It never sends both switches; a container name would make Brave reuse a named temporary container.
 
-These are separate `Process.arguments` elements, not a shell command. `open -a Brave --args` is not used. Brave handles its existing-instance handoff. The adapter also checks the data directory's singleton owner and rejects a different running installation. Activation targets that browser process after the handoff; a live check must still confirm the intended profile window.
+These are separate `Process.arguments` elements, not a shell command. `open -a Brave --args` is not used. Brave handles its existing-instance handoff. The adapter also checks the data directory's singleton owner and rejects a different running installation or an owner it cannot establish. A malformed, foreign-host or unreadable singleton lock fails closed. A stale lock with no live process permits launch. Activation targets that browser process after the handoff; a live check must still confirm the intended profile window. Failure to confirm foreground activation within about nine seconds produces an error; it does not resend the URL.
 
 HTTP/HTTPS text from raw URL Apple events is passed unchanged after validation, including percent escapes, Unicode, queries and fragments. AppKit-batched URLs use the representation AppKit supplies; the adapter cannot undo normalization already performed by a sender or macOS. Unsupported schemes, invalid escapes, whitespace/control characters, and empty hosts are rejected. Batches larger than the conservative 128 KiB argument budget are rejected with an error; split them into smaller batches.
 
@@ -94,6 +104,14 @@ Errors appear in a native alert. The CLI prints metadata diagnostics to the term
 Each destination contains `ContainerReceiver`, `Info.plist`, `destination.json`, `appearance.json`, and `Destination.icns`. Configuration has owner-only file permissions. It is plaintext and contains local paths and container identity. It is not a portable distribution artifact.
 
 The generator checks its ownership marker and the derived bundle ID, rejects symlinks and unrelated filename collisions, locks the output folder, stages and verifies the app, then uses exclusive rename or atomic swap. A rename plus replacement is two filesystem operations, not a single transaction. Error handling attempts to restore the old name; a failed rollback reports where the original app remains. Running receivers must be quit before updating.
+
+Signing and registration run off the main thread with a 15-second timeout. Setup
+allows cancellation while they run. A cancellation before the filesystem commit
+preserves the previous app. Cancellation after installation may leave the new app
+installed but not registered; inspect the app directory before retrying. Timeout
+and cancellation terminate only the helper process started by this operation.
+Hidden abandoned staging bundles are ignored during discovery and preserved for
+inspection. The generator does not claim a crash-safe multi-operation transaction.
 
 Ownership markers identify managed bundles. They do not authenticate an untrusted bundle supplied by another person. Installation and data path overrides are trusted local user choices. The adapter checks Brave's filename and version metadata, but does not verify its vendor signature.
 
