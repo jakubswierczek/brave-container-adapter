@@ -10,6 +10,8 @@
 
 Use **Choose Brave…** and **Choose data folder…** for nonstandard paths. The data folder must contain `Local State`. Do not select an individual profile folder.
 
+Use **Copy diagnostics** to collect a report for troubleshooting. Review profile and container names before sharing it.
+
 Generate destination apps on each target Mac. They contain that Mac's paths and local destination configuration. The setup app contains no browser data and can be removed after generation. Generated apps work without the checkout or setup app.
 
 The release DMG and setup app have Developer ID signatures and notarization tickets. A normal first-open confirmation can still appear. Locally built DMGs and generated destination apps use ad-hoc signing. See [signing](signing.md) and [troubleshooting](troubleshooting.md).

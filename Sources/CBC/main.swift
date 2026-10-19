@@ -35,6 +35,7 @@ private struct Options {
         switch command {
         case "help", "--help", "-h", "version", "--version": allowed = []
         case "list": allowed = pathOptions
+        case "diagnose": allowed = ["--brave", "--user-data-dir"]
         case "doctor": allowed = pathOptions.union(["--container-id", "--app"])
         case "generate": allowed = pathOptions.union(appearance).union(["--container-id", "--output"])
         case "install": allowed = pathOptions.union(appearance).union(["--container-id"])
@@ -72,6 +73,7 @@ private func run() async throws {
         print("""
         cbc list [--profile DIRECTORY] [path options]
         cbc version
+        cbc diagnose [path options]
         cbc doctor [--app PATH | --profile DIRECTORY (--container-id ID | --temporary)] [path options]
         cbc generate --profile DIRECTORY (--container-id ID | --temporary) --output DIRECTORY [options]
         cbc install (--all | --profile DIRECTORY (--container-id ID | --temporary)) [options]
@@ -87,6 +89,11 @@ private func run() async throws {
         --name changes the app label and filename; no automatic hash suffix is added.
         No command changes Brave preferences or the default browser.
         """)
+        return
+    }
+    if options.command == "diagnose" {
+        let installed = AppGenerator.installedApps(directories: AppGenerator.installDirectories)
+        print(Diagnostics.report(paths: options.paths, installedApps: installed.apps, installedAppIssues: installed.issues), terminator: "")
         return
     }
     guard ["list", "doctor", "generate", "install", "customize"].contains(options.command) else {

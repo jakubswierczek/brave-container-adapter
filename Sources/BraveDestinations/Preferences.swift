@@ -34,7 +34,7 @@ private struct LocalState: Decodable {
     let browser: BrowserSection?
 }
 
-private struct Preferences: Decodable {
+struct Preferences: Decodable {
     struct Brave: Decodable {
         struct Containers: Decodable {
             let enabled: Bool?
@@ -90,6 +90,34 @@ public struct Discovery: Sendable {
         return ContainerSnapshot(enabled: value?.enabled == true, configured: configured, retained: retained)
     }
 
+    public func scan() throws -> DiscoveryScan {
+        let installation = try BraveInstallation(paths: paths)
+        var ready: [ResolvedDestination] = []
+        var problems: [String] = []
+        for profile in try profiles() {
+            do {
+                let snapshot = try containers(profileDirectory: profile.directory)
+                if !snapshot.enabled {
+                    problems.append("\(profile.directory): Enable Containers and save a container in Brave’s UI, then Refresh.")
+                }
+                if snapshot.configured == nil {
+                    problems.append("\(profile.directory): Add or edit a named container in Brave’s UI, then Refresh.")
+                }
+                guard snapshot.enabled else { continue }
+                let selections: [ContainerSelection] = (installation.supportsTemporaryContainers ? [.temporary] : []) +
+                    (snapshot.configured ?? []).map { .configured(id: $0.id) }
+                for selection in selections {
+                    do {
+                        ready.append(try resolve(Destination(paths: paths, profileDirectory: profile.directory, selection: selection)))
+                    } catch is CancellationError { throw CancellationError() }
+                    catch { problems.append("\(profile.directory): " + ((error as? AdapterError)?.message ?? "Could not resolve destination.")) }
+                }
+            } catch is CancellationError { throw CancellationError() }
+            catch { problems.append("\(profile.directory): " + ((error as? AdapterError)?.message ?? "Could not read this profile’s settings.")) }
+        }
+        return DiscoveryScan(destinations: ready, problems: problems)
+    }
+
     public func resolve(_ destination: Destination) throws -> ResolvedDestination {
         guard destination.paths == paths else { throw AdapterError("Destination paths do not match discovery paths.") }
         guard let profile = try profiles().first(where: { $0.directory == destination.profileDirectory }) else {
@@ -120,5 +148,16 @@ public struct Discovery: Sendable {
             throw AdapterError("Multiple configured containers have the same name. Rename one in Brave before opening links.")
         }
         return ResolvedDestination(destination: destination, profile: profile, container: .configured(container))
+    }
+}
+
+public struct DiscoveryScan: Sendable {
+    public let destinations: [ResolvedDestination]
+    public let problems: [String]
+
+    public var status: String {
+        destinations.isEmpty
+            ? "No ready destinations. " + (problems.first ?? "No saved configured containers were found.")
+            : "\(destinations.count) destinations ready." + (problems.isEmpty ? "" : " Some profiles or containers are unavailable; check their saved settings in Brave.")
     }
 }

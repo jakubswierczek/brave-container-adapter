@@ -6,6 +6,8 @@ import UniformTypeIdentifiers
 @MainActor
 final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
     private var window: NSWindow!
+    private var diagnosticsWindow: NSWindow?
+    private let diagnosticsText = NSTextView()
     private var controls: [NSControl] = []
     private var enabledBeforeWork: [Bool] = []
     private var operationTask: Task<Void, Never>?
@@ -66,6 +68,7 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
             button("Choose Brave…", #selector(chooseBrave)),
             button("Choose data folder…", #selector(chooseData)),
             button("Use standard locations", #selector(resetLocations)),
+            button("Copy diagnostics", #selector(copyDiagnostics)),
         ])
         pathsButtons.spacing = 10
         location.font = .systemFont(ofSize: 11)
@@ -160,49 +163,78 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
             self.selectedDestination = nil
             self.location.stringValue = "Brave: \(self.paths.application)\nData: \(self.paths.userData)"
             let paths = self.paths
-            let result = try await BackgroundWork.run { try Self.scan(paths) }
+            let result = try await BackgroundWork.run { try Discovery(paths: paths).scan() }
             try Task.checkCancellation()
-            self.destinations = result.0
+            self.destinations = result.destinations
             self.picker.addItems(withTitles: self.destinations.map(\.displayName))
-            self.status.stringValue = result.1
+            self.status.stringValue = result.status
             try await self.selectDestination()
         }
     }
 
-    nonisolated private static func scan(_ paths: BravePaths) throws -> ([ResolvedDestination], String) {
-        let installation = try BraveInstallation(paths: paths)
-        let discovery = Discovery(paths: paths)
-        var ready: [ResolvedDestination] = []
-        var unavailable = 0
-        var firstProblem: String?
-        for profile in try discovery.profiles() {
-            do {
-                let snapshot = try discovery.containers(profileDirectory: profile.directory)
-                guard snapshot.enabled else {
-                    unavailable += 1
-                    firstProblem = firstProblem ?? "Enable Containers and save a container in Brave’s UI, then Refresh."
-                    continue
-                }
-                if installation.supportsTemporaryContainers {
-                    ready.append(try discovery.resolve(Destination(paths: paths, profileDirectory: profile.directory, selection: .temporary)))
-                }
-                if snapshot.configured == nil {
-                    unavailable += 1
-                    firstProblem = firstProblem ?? "Add or edit a named container in Brave’s UI, then Refresh."
-                }
-                for container in snapshot.configured ?? [] {
-                    ready.append(try discovery.resolve(Destination(paths: paths, profileDirectory: profile.directory, containerID: container.id)))
-                }
-            } catch is CancellationError { throw CancellationError() }
-            catch {
-                unavailable += 1
-                firstProblem = firstProblem ?? (error as? AdapterError)?.message ?? "Could not read this profile’s settings."
+    @objc private func copyDiagnostics() {
+        runOperation("Collecting diagnostics…") {
+            let paths = self.paths
+            let directories = AppGenerator.installDirectories
+            let report = try await BackgroundWork.run {
+                let installed = AppGenerator.installedApps(directories: directories)
+                return Diagnostics.report(paths: paths, installedApps: installed.apps, installedAppIssues: installed.issues)
             }
+            try Task.checkCancellation()
+            self.diagnosticsText.string = report
+            self.copyReport()
+            self.showDiagnostics()
+            self.status.stringValue = "Diagnostics copied to the clipboard. Review the names in the report before sharing it."
         }
-        let status = ready.isEmpty
-            ? "No ready destinations. " + (firstProblem ?? "No saved configured containers were found.")
-            : "\(ready.count) destinations ready." + (unavailable > 0 ? " Some profiles or containers are unavailable; check their saved settings in Brave." : "")
-        return (ready, status)
+    }
+
+    @objc private func copyReport() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(diagnosticsText.string, forType: .string)
+    }
+
+    private func showDiagnostics() {
+        if diagnosticsWindow == nil {
+            let reportWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 680, height: 520),
+                                        styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+            reportWindow.title = "Diagnostics"
+            reportWindow.isReleasedWhenClosed = false
+            let scroll = NSScrollView()
+            scroll.hasVerticalScroller = true
+            scroll.borderType = .bezelBorder
+            diagnosticsText.frame = NSRect(x: 0, y: 0, width: 648, height: 450)
+            diagnosticsText.isEditable = false
+            diagnosticsText.isSelectable = true
+            diagnosticsText.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+            diagnosticsText.textContainerInset = NSSize(width: 8, height: 8)
+            diagnosticsText.isVerticallyResizable = true
+            diagnosticsText.isHorizontallyResizable = false
+            diagnosticsText.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+            diagnosticsText.autoresizingMask = [.width]
+            diagnosticsText.textContainer?.widthTracksTextView = true
+            scroll.documentView = diagnosticsText
+            let copy = NSButton(title: "Copy", target: self, action: #selector(copyReport))
+            copy.bezelStyle = .rounded
+            let stack = NSStackView(views: [scroll, copy])
+            stack.orientation = .vertical
+            stack.alignment = .trailing
+            stack.spacing = 10
+            stack.translatesAutoresizingMaskIntoConstraints = false
+            let content = reportWindow.contentView!
+            content.addSubview(stack)
+            NSLayoutConstraint.activate([
+                stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 16),
+                stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -16),
+                stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 16),
+                stack.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -16),
+                scroll.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            ])
+            diagnosticsWindow = reportWindow
+            reportWindow.center()
+        }
+        diagnosticsText.scrollRangeToVisible(NSRange(location: 0, length: 0))
+        diagnosticsWindow?.makeKeyAndOrderFront(nil)
+        diagnosticsWindow?.makeFirstResponder(diagnosticsText)
     }
 
     @objc private func selectionChanged() {

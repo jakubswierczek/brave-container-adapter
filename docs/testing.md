@@ -16,6 +16,7 @@ Run the commands in [development](development.md). Swift Testing uses synthetic
 - Browser ownership, stale/foreign locks and safe activation selection.
 - Signing timeout/cancellation, failed swaps, rollback failures and retry recovery.
 - Real CLI parsing, safe diagnostics, generation/customization and read-only fixture hashes.
+- Copyable diagnostics: JSON shapes, schema error paths, missing files, home-path redaction, private-value omission and all readiness failures.
 
 `scripts/test.sh` runs Swift tests and the process-level CLI checks. CI runs tests
 and release builds on `macos-14`, `macos-15` and `macos-15-intel`; macOS 15 also

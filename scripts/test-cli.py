@@ -42,9 +42,13 @@ with tempfile.TemporaryDirectory(prefix="cbc-cli-test-") as temporary:
     listing = run(["list", *paths])
     assert "Default" in listing and "Test profile" in listing and "test-work" in listing
     assert "test-retained" not in listing
+    diagnostic = run(["diagnose", *paths])
+    assert "Default" in diagnostic and "test-work" in diagnostic and "enabled: true" in diagnostic
+    assert "ready destinations: 3" in diagnostic
     run(["doctor", *paths, "--profile", "Default", "--temporary"])
     for arguments in [
         ["list", "--name", "ignored"], ["doctor", "--all"],
+        ["diagnose", *paths, "--profile", "Default"], ["diagnose", *paths, "--temporary"],
         ["generate", "--all"], ["install", "--all", "--name", "ignored"],
         ["list", "--profile", "Default", "--profile", "Default"],
         ["doctor", "--app", str(root / "missing.app"), "--profile", "Default"],
@@ -71,4 +75,8 @@ with tempfile.TemporaryDirectory(prefix="cbc-cli-test-") as temporary:
     (data / "Default/Preferences").write_text("{ synthetic_private_value_DO_NOT_LOG")
     error = run(["list", *paths], success=False)
     assert "synthetic_private_value_DO_NOT_LOG" not in error
-print("CLI checks passed: discovery, validation, generation, customization, signatures, read-only data and redacted errors")
+    diagnostic = run(["diagnose", *paths])
+    assert "synthetic_private_value_DO_NOT_LOG" not in diagnostic
+    assert "JSON parses: false" in diagnostic
+    assert "strict decode: dataCorrupted" in diagnostic
+print("CLI checks passed: discovery, diagnostics, validation, generation, customization, signatures, read-only data and redacted errors")

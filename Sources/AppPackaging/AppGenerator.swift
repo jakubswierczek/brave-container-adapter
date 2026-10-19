@@ -33,10 +33,29 @@ public enum AppGenerator {
     }
 
     public static func installedApp(for destination: Destination) throws -> URL? {
-        let legacy = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/Choosy Brave Containers")
-        let matches = try [installDirectory, legacy].flatMap { try matchingApps(destination: destination, directory: $0) }
+        let matches = try installDirectories.flatMap { try matchingApps(destination: destination, directory: $0) }
         guard matches.count <= 1 else { throw AdapterError("Multiple installed apps target this destination. Use Edit installed app to select one.") }
         return matches.first
+    }
+
+    nonisolated public static func installedApps(directories: [URL]) -> (apps: [URL], issues: [String]) {
+        var apps: [URL] = []
+        var issues: [String] = []
+        for directory in directories {
+            do {
+                for app in try appCandidates(in: directory) {
+                    let plist = app.appendingPathComponent("Contents/Info.plist")
+                    if let data = try? BoundedFile.read(at: plist, limit: FileReadLimit.configuration),
+                       let info = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+                       info["CBCManagedBundle"] as? Bool == true { apps.append(app) }
+                }
+            } catch { issues.append("Could not list installed apps in \(directory.path).") }
+        }
+        return (apps, issues)
+    }
+
+    public static var installDirectories: [URL] {
+        [installDirectory, FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/Choosy Brave Containers")]
     }
 
     public static func existingApp(for destination: Destination, directory: URL) throws -> URL? {
@@ -46,9 +65,14 @@ public enum AppGenerator {
     }
 
     private static func matchingApps(destination: Destination, directory: URL) throws -> [URL] {
+        try appCandidates(in: directory).filter { (try? readManagedApp($0).destination) == destination }
+    }
+
+    nonisolated private static func appCandidates(in directory: URL) throws -> [URL] {
         guard FileManager.default.fileExists(atPath: directory.path) else { return [] }
         return try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isSymbolicLinkKey])
-            .filter { app in !app.lastPathComponent.hasPrefix(".") && (try? readManagedApp(app).destination) == destination }
+            .filter { !$0.lastPathComponent.hasPrefix(".") && $0.pathExtension.lowercased() == "app" &&
+                (try? $0.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == false }
     }
 
     public static func savedIcon(at app: URL) throws -> AppIcon {

@@ -1,5 +1,22 @@
 # Troubleshooting
 
+## Collect diagnostics
+
+In Setup, click **Copy diagnostics**. The report is copied to the clipboard and
+opens in a selectable window with a **Copy** button. Or run:
+
+```bash
+dist/bin/cbc diagnose
+dist/bin/cbc diagnose --brave '/path/to/Brave Browser.app' --user-data-dir '/path/to/data'
+```
+
+The read-only report includes versions, paths, saved profile/container names and
+IDs, container flags, file sizes, JSON types, record shapes, decoding error paths,
+singleton ownership, installed destination apps and readiness problems. Home paths
+use `~`. It omits URLs, cookies, history, raw JSON and other preference values.
+Review names before pasting the report into a chat or issue. Diagnostics reports
+saved files; it does not confirm GUI routing.
+
 ## Diagnose routing
 
 ```bash

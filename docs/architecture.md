@@ -49,6 +49,8 @@ dist/bin/cbc list \
 
 `Local State` → `profile.info_cache` supplies the profile **directory key** and display name. Pass `Default` or `Profile 1` to `--profile`, not a display name such as `Personal`.
 
+`cbc diagnose` and Setup’s **Copy diagnostics** read the same bounded metadata files and print JSON shapes rather than preference values; profile/container names, IDs and container flags are included for troubleshooting.
+
 The selected profile's `Preferences` contains nested `brave.containers` data:
 
 | Key | Meaning |
