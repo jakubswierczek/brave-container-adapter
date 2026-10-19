@@ -50,6 +50,10 @@ records. The script checks signatures, both architectures, ticket validity, imag
 integrity and Gatekeeper. Only a completed attempt gets its final DMG checksum.
 It never publishes to GitHub.
 
+Architecture checks invoke `lipo -verify_arch` separately for `arm64` and `x86_64`
+on both executables. This supports local `lipo` versions that reject multiple
+architectures in one invocation; either missing architecture still stops packaging.
+
 ## Monitor or resume
 
 Each submission ID is printed after upload and saved before waiting. On the signing Mac:

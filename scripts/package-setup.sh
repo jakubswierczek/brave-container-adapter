@@ -60,8 +60,10 @@ PLIST
 codesign --force --sign - "$app/Contents/Resources/ContainerReceiver"
 codesign --force --sign - "$app"
 codesign --verify --strict "$app"
-lipo "$app/Contents/MacOS/ContainerSetup" -verify_arch arm64 x86_64
-lipo "$app/Contents/Resources/ContainerReceiver" -verify_arch arm64 x86_64
+for arch in arm64 x86_64; do
+  lipo "$app/Contents/MacOS/ContainerSetup" -verify_arch "$arch"
+  lipo "$app/Contents/Resources/ContainerReceiver" -verify_arch "$arch"
+done
 if [[ $# == 2 ]]; then
   mkdir -p "$2"
   target="$2/Brave Container Setup.app"

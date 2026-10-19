@@ -38,8 +38,10 @@ codesign --force --sign "$identity" --options runtime --timestamp "$receiver"
 codesign --force --sign "$identity" --options runtime --timestamp "$app"
 codesign --verify --strict "$receiver"
 codesign --verify --strict "$app"
-lipo "$app/Contents/MacOS/ContainerSetup" -verify_arch arm64 x86_64
-lipo "$receiver" -verify_arch arm64 x86_64
+for arch in arm64 x86_64; do
+  lipo "$app/Contents/MacOS/ContainerSetup" -verify_arch "$arch"
+  lipo "$receiver" -verify_arch "$arch"
+done
 ditto -c -k --sequesterRsrc --keepParent "$app" "$attempt/submission.zip"
 submit_and_wait() {
   local file="$1" label="$2" submission_id status
