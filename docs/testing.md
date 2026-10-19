@@ -17,6 +17,8 @@ Run the commands in [development](development.md). Swift Testing uses synthetic
 - Signing timeout/cancellation, failed swaps, rollback failures and retry recovery.
 - Real CLI parsing, safe diagnostics, generation/customization and read-only fixture hashes.
 - Copyable diagnostics: JSON shapes, schema error paths, missing files, home-path redaction, private-value omission and all readiness failures.
+- Custom icon styling: aspect ratio, transparent corners, optional clipping, original-image retention, repeated saves and legacy appearance compatibility.
+- Update packaging: public-key validation, disabled automatic updates, versioned appcast metadata, changed-archive rejection and mismatched-key rejection.
 
 `scripts/test.sh` runs Swift tests and the process-level CLI checks. CI runs tests
 and release builds on `macos-14`, `macos-15` and `macos-15-intel`; macOS 15 also
@@ -57,6 +59,16 @@ not cookie isolation. Forced termination of only the disposable process was need
 for cold checks; graceful session-restoration behavior remains unverified.
 
 ## Manual release matrix
+
+For Setup updates, also verify **Check for Updates…** from the window and app menu.
+Check the current-version result, an unavailable feed, and a real download/install/relaunch
+using a disposable older Setup copy. Verify the copied app's version and signature after
+replacement. Keep test-copy results separate from second-Mac or browser-quarantine proof.
+The first updater-enabled version needs a manual install; older versions cannot discover it.
+
+For custom artwork, compare **Original** and **macOS style** in the actual Setup preview,
+save a disposable destination, reopen it, and switch back. Confirm the original artwork
+survives without its source file and that repeated saves do not compound the styling.
 
 Use a separate test data directory. Initialize two profiles in Brave. Enable
 Containers and create two disposable named containers through Brave's UI. Never

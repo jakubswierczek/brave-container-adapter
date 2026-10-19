@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import AppPackaging
 import BraveDestinations
 import UniformTypeIdentifiers
@@ -7,6 +8,10 @@ import UniformTypeIdentifiers
 final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
     private var window: NSWindow!
     private var diagnosticsWindow: NSWindow?
+    private var updater: SetupUpdater?
+    private var updateObservation: AnyCancellable?
+    private var updateButton: NSButton!
+    private var updateMenuItem: NSMenuItem!
     private let diagnosticsText = NSTextView()
     private var controls: [NSControl] = []
     private var enabledBeforeWork: [Bool] = []
@@ -18,6 +23,7 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
     private let appName = NSTextField()
     private let iconPicker = NSPopUpButton()
     private let iconPreview = NSImageView()
+    private let customStylePicker = NSPopUpButton()
     private var selectedDestination: Destination?
     private var editingApp: URL?
     private var customIcon: Data?
@@ -60,9 +66,14 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         iconPicker.target = self
         iconPicker.action = #selector(iconChanged)
         iconPicker.setAccessibilityLabel("Destination icon style")
+        customStylePicker.addItems(withTitles: CustomIconStyle.allCases.map(\.title))
+        customStylePicker.target = self
+        customStylePicker.action = #selector(iconChanged)
+        customStylePicker.setAccessibilityLabel("Custom image style")
+        customStylePicker.isEnabled = false
         iconPreview.imageScaling = .scaleProportionallyUpOrDown
         iconPreview.setAccessibilityLabel("Destination icon preview")
-        let iconRow = NSStackView(views: [iconPreview, iconPicker, button("Choose image…", #selector(chooseIcon))])
+        let iconRow = NSStackView(views: [iconPreview, iconPicker, customStylePicker, button("Choose image…", #selector(chooseIcon))])
         iconRow.spacing = 14
         let pathsButtons = NSStackView(views: [
             button("Choose Brave…", #selector(chooseBrave)),
@@ -78,7 +89,13 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
             "Temporary opens each request in a fresh container; URLs received together share it. Brave may retain temporary data for tab restoration. Requires Brave 1.95.101+. Enable Containers in Brave Settings → Content, wait for settings to save, then Refresh. Your default browser stays unchanged.")
         footer.font = .systemFont(ofSize: 12)
         footer.textColor = .secondaryLabelColor
-        let stack = NSStackView(views: [title, instructions, picker, nameRow, nameHelp, iconRow, buttons, status, pathsButtons, location, footer])
+        updateButton = NSButton(title: "Check for Updates…", target: self, action: #selector(checkForUpdates))
+        updateButton.bezelStyle = .rounded
+        let version = NSTextField(labelWithString: "Version \(ReleaseVersion.version)")
+        version.textColor = .secondaryLabelColor
+        let updateRow = NSStackView(views: [version, updateButton])
+        updateRow.spacing = 12
+        let stack = NSStackView(views: [title, instructions, picker, nameRow, nameHelp, iconRow, buttons, status, pathsButtons, location, footer, updateRow])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 16
@@ -104,6 +121,10 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         let menu = NSMenu()
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
+        updateMenuItem = appMenu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+        updateMenuItem.target = self
+        appMenu.autoenablesItems = false
+        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Quit Brave Container Setup", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         menu.addItem(appItem)
@@ -120,7 +141,13 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         editItem.submenu = editMenu
         menu.addItem(editItem)
         NSApplication.shared.mainMenu = menu
-        controls += [picker, appName, iconPicker, installButton]
+        let updater = SetupUpdater()
+        self.updater = updater
+        updateObservation = updater.$canCheckForUpdates.sink { [weak self] _ in
+            Task { @MainActor [weak self] in self?.updateAvailability() }
+        }
+        updateAvailability()
+        controls += [picker, appName, iconPicker, customStylePicker, installButton]
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
@@ -134,9 +161,28 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         return button
     }
 
+    private func updateAvailability() {
+        let available = !isBusy && (updater?.canCheckForUpdates == true || updater?.configurationError != nil)
+        updateButton.isEnabled = available
+        updateMenuItem.isEnabled = available
+    }
+
+    @objc private func checkForUpdates() {
+        guard !isBusy, let updater else { return }
+        if let error = updater.configurationError {
+            let alert = NSAlert()
+            alert.messageText = "Updates unavailable"
+            alert.informativeText = error
+            alert.beginSheetModal(for: window)
+        } else {
+            updater.checkForUpdates(updateButton)
+        }
+    }
+
     private func runOperation(_ label: String, action: @escaping @MainActor () async throws -> Void) {
         guard !isBusy else { return }
         isBusy = true
+        updateAvailability()
         enabledBeforeWork = controls.map(\.isEnabled)
         controls.forEach { $0.isEnabled = false }
         installButton.isEnabled = true
@@ -146,6 +192,8 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
             defer {
                 for (control, enabled) in zip(controls, enabledBeforeWork) { control.isEnabled = enabled }
                 isBusy = false
+                updateAvailability()
+                updateIconStyleAvailability()
                 installButton.title = editingApp == nil ? "Install destination" : "Save app"
                 installButton.isEnabled = selectedDestination != nil
                 operationTask = nil
@@ -247,6 +295,7 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         shortName = nil
         appName.stringValue = ""
         customIcon = nil
+        customStylePicker.isEnabled = false
         iconPreview.image = nil
         iconPicker.removeAllItems()
         installButton.isEnabled = false
@@ -295,8 +344,9 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
         iconPicker.addItems(withTitles: IconPreset.allCases.map(\.title))
         switch icon {
         case .generated(let preset): iconPicker.selectItem(at: IconPreset.allCases.firstIndex(of: preset) ?? 0)
-        case .custom(let data):
+        case .custom(let data, let style):
             customIcon = data
+            customStylePicker.selectItem(at: CustomIconStyle.allCases.firstIndex(of: style) ?? 0)
             iconPicker.addItem(withTitle: "Custom image")
             iconPicker.selectItem(at: IconPreset.allCases.count)
         }
@@ -306,11 +356,19 @@ final class Setup: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
     @objc private func iconChanged() {
         if IconPreset.allCases.indices.contains(iconPicker.indexOfSelectedItem) {
             selectedIcon = .generated(IconPreset.allCases[iconPicker.indexOfSelectedItem])
-        } else if let data = customIcon { selectedIcon = .custom(data) }
+        } else if let data = customIcon {
+            selectedIcon = .custom(data, style: CustomIconStyle.allCases[customStylePicker.indexOfSelectedItem])
+        }
         updatePreview()
     }
 
+    private func updateIconStyleAvailability() {
+        if case .custom = selectedIcon { customStylePicker.isEnabled = !isBusy }
+        else { customStylePicker.isEnabled = false }
+    }
+
     private func updatePreview() {
+        updateIconStyleAvailability()
         guard let destination = selectedDestination else { iconPreview.image = nil; return }
         let config = DestinationConfiguration(destination: destination, displayName: appName.stringValue)
         do { iconPreview.image = try DestinationIcons.preview(for: selectedIcon, configuration: config) }

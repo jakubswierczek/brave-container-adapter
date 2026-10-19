@@ -79,9 +79,19 @@ public enum AppGenerator {
         _ = try readManagedApp(app)
         let resources = app.appendingPathComponent("Contents/Resources")
         if let data = try? BoundedFile.read(at: resources.appendingPathComponent("appearance.json"), limit: FileReadLimit.configuration),
-           let saved = try? JSONDecoder().decode([String: String].self, from: data),
-           let raw = saved["iconPreset"], let preset = IconPreset(rawValue: raw) {
-            return .generated(preset)
+           let saved = try? JSONDecoder().decode([String: String].self, from: data) {
+            if let raw = saved["iconPreset"], let preset = IconPreset(rawValue: raw) {
+                return .generated(preset)
+            }
+            if let raw = saved["iconStyle"] {
+                guard let style = CustomIconStyle(rawValue: raw) else {
+                    throw AdapterError("The saved custom icon style is unsupported. Choose another icon.")
+                }
+                if style == .macOS {
+                    return .custom(try BoundedFile.read(at: resources.appendingPathComponent("CustomOriginal.icns"),
+                                                       limit: FileReadLimit.icon), style: style)
+                }
+            }
         }
         return .custom(try BoundedFile.read(at: resources.appendingPathComponent("Destination.icns"), limit: FileReadLimit.icon))
     }
@@ -171,12 +181,17 @@ public enum AppGenerator {
         try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
             .write(to: staging.appendingPathComponent("Contents/Info.plist"))
         try iconData.write(to: resources.appendingPathComponent("Destination.icns"))
-        let preset: String
+        var appearance: [String: String]
         switch selectedIcon {
-        case .generated(let value): preset = value.rawValue
-        case .custom: preset = "custom"
+        case .generated(let value): appearance = ["iconPreset": value.rawValue]
+        case .custom(let original, let style):
+            appearance = ["iconPreset": "custom"]
+            if style == .macOS {
+                appearance["iconStyle"] = style.rawValue
+                try original.write(to: resources.appendingPathComponent("CustomOriginal.icns"))
+            }
         }
-        try encoder.encode(["iconPreset": preset]).write(to: resources.appendingPathComponent("appearance.json"))
+        try encoder.encode(appearance).write(to: resources.appendingPathComponent("appearance.json"))
         try await services.runTool(ToolInvocation(executable: "/usr/bin/codesign", arguments: ["--force", "--sign", "-", staging.path], failure: "Could not ad-hoc sign the app."))
         try await services.runTool(ToolInvocation(executable: "/usr/bin/codesign", arguments: ["--verify", "--strict", staging.path], failure: "Generated app signature verification failed."))
         try Task.checkCancellation()

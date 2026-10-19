@@ -5,7 +5,7 @@
 | `BraveDestinations` | Read-only discovery, stable identity, validation, URL handling, launch requests, `Process` handoff |
 | `AppPackaging` | Bundle generation, icons, ownership checks, local signing and Launch Services registration |
 | `ContainerReceiver` | Resident AppKit URL receiver and error alerts |
-| `ContainerSetup` | Native destination and appearance editor |
+| `ContainerSetup` | Native destination and appearance editor; Sparkle updates for Setup |
 | `CBC` | CLI; installed executable remains `cbc` |
 
 ```mermaid
@@ -103,7 +103,7 @@ Errors appear in a native alert. The CLI prints metadata diagnostics to the term
 
 ## Bundle contents and updates
 
-Each destination contains `ContainerReceiver`, `Info.plist`, `destination.json`, `appearance.json`, and `Destination.icns`. Configuration has owner-only file permissions. It is plaintext and contains local paths and container identity. It is not a portable distribution artifact.
+Each destination contains `ContainerReceiver`, `Info.plist`, `destination.json`, `appearance.json`, and `Destination.icns`. Styled custom icons also retain normalized original artwork inside the bundle, so editing does not repeatedly apply the treatment. Configuration has owner-only file permissions. It is plaintext and contains local paths and container identity. It is not a portable distribution artifact.
 
 The generator checks its ownership marker and the derived bundle ID, rejects symlinks and unrelated filename collisions, locks the output folder, stages and verifies the app, then uses exclusive rename or atomic swap. A rename plus replacement is two filesystem operations, not a single transaction. Error handling attempts to restore the old name; a failed rollback reports where the original app remains. Running receivers must be quit before updating.
 
@@ -116,6 +116,8 @@ Hidden abandoned staging bundles are ignored during discovery and preserved for
 inspection. The generator does not claim a crash-safe multi-operation transaction.
 
 Ownership markers identify managed bundles. They do not authenticate an untrusted bundle supplied by another person. Installation and data path overrides are trusted local user choices. The adapter checks Brave's filename and version metadata, but does not verify its vendor signature.
+
+Setup embeds Sparkle for user-initiated updates from the GitHub release feed. Updates replace Setup only; existing generated apps retain their local configuration and receiver until regenerated. The CLI and receivers do not link the updater. See [updates](updates.md) for signing and publishing.
 
 ## Limits and guarantees
 

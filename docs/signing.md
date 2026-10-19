@@ -1,6 +1,6 @@
 # Signing and releases
 
-Release downloads use `Brave-Container-Adapter.dmg` and its `.sha256` file. The setup
+Release downloads use `Brave-Container-Adapter.dmg`, its `.sha256` file and Sparkle's `appcast.xml`. The setup
 app and DMG are Developer ID signed and notarized. Local package builds and locally
 generated destination apps are ad-hoc signed. Filenames do not describe signing state.
 
@@ -25,6 +25,10 @@ Apple lists **Account Holder** as the role required to create a Developer ID cer
 
    Use the team associated with your signing certificate. Find its Team ID in your developer account's Membership details. At the secure prompt, enter an [app-specific password](https://support.apple.com/en-us/102654) generated at account.apple.com under Sign-In and Security. This differs from your normal account password and the password protecting a certificate export. Enter it only locally, never in chat or a committed file. The explicit flags select Apple ID authentication without asking for an API private key. A suitable App Store Connect API key is another supported authentication method; see `xcrun notarytool store-credentials --help`.
 
+Provision the updater public key and Keychain account `brave-container-adapter` as
+described in [updates](updates.md#key-configuration). Only the public key is tracked.
+Release signing rejects missing configuration.
+
 ## Build and notarize
 
 Run checks from a clean source commit first. The signing script rejects uncommitted changes. Setup includes a public-safe `build-info.json` with its source commit, toolchain and dependency inventory. The release version and build number
@@ -38,8 +42,9 @@ scripts/notarize-setup.sh YOUR_40_CHARACTER_CERTIFICATE_HASH cbc-notary
 ```
 
 The signing script verifies the local identity and saved credentials, builds both
-architectures, and signs the receiver then Setup with Hardened Runtime and secure
-timestamps. It submits an internal ZIP, waits for acceptance, and staples the app.
+architectures, and signs Sparkle's nested executables/XPC services/updater app, its
+framework, the receiver and Setup inside out with Hardened Runtime and secure
+timestamps. Helper entitlements and framework symlinks are preserved. It submits an internal ZIP, waits for acceptance, and staples the app.
 It then creates and signs the DMG, submits that image, and staples its ticket.
 The two submissions let both the mounted disk and the copied app carry tickets.
 No ZIP is published. See [Apple's notarization workflow](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
@@ -48,10 +53,12 @@ Each attempt stays in ignored `dist/notarization.XXXXXX/`. It contains separate
 `app-submission.json`, `app-result.json`, `app-log.json` and corresponding `dmg-*`
 records. The script checks signatures, both architectures, ticket validity, image
 integrity and Gatekeeper. Only a completed attempt gets its final DMG checksum.
+After the final checksum it generates and verifies an EdDSA-signed DMG enclosure
+in `appcast.xml`, using only the existing Keychain key. See [updates](updates.md).
 It never publishes to GitHub.
 
 Architecture checks invoke `lipo -verify_arch` separately for `arm64` and `x86_64`
-on both executables. This supports local `lipo` versions that reject multiple
+on Setup, the receiver, and all Sparkle framework/helper binaries. This supports local `lipo` versions that reject multiple
 architectures in one invocation; either missing architecture still stops packaging.
 
 ## Monitor or resume
@@ -72,6 +79,8 @@ If the app submission later becomes accepted, staple and validate that same app,
 create the DMG with `scripts/create-dmg.sh`, sign it, and submit the DMG. If only the
 DMG wait timed out, continue with that same DMG after acceptance; do not rebuild.
 These manual completion steps use the same commands as `scripts/notarize-setup.sh`.
+Recompute the final DMG checksum, then run `python3 scripts/release-appcast.py
+ATTEMPT_DIRECTORY`. Do not change the DMG after its appcast signature is generated.
 
 ## Validate the distribution
 
@@ -98,7 +107,8 @@ examples. A Developer ID signature exposes its publisher name and Team ID by des
 ## Publish
 
 Create a release from the verified source commit. Upload only the final DMG and
-checksum. Keep credentials and notarization records local. Use a body file for release
+checksum and `appcast.xml`. Use tag `vVERSION` matching the bundled version and mark
+the release stable for the feed's `latest` redirect. Keep credentials and notarization records local. Use a body file for release
 notes and include exact checks, supported versions and remaining manual checks.
 Download the uploaded assets again; verify checksum, signatures, tickets, image
 contents and Gatekeeper. A GitHub CLI download does not simulate a browser's quarantine

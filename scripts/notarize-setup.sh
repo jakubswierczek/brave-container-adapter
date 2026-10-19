@@ -24,6 +24,8 @@ fi
 if [[ -z "${DEVELOPER_DIR:-}" && -d /Applications/Xcode.app/Contents/Developer ]]; then
   export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 fi
+# Fail before building or uploading when updater authentication is unconfigured.
+python3 scripts/updater.py require-key
 # Verify saved credentials before building or uploading anything.
 xcrun notarytool history --keychain-profile "$profile" --output-format json > /dev/null
 
@@ -33,15 +35,8 @@ attempt="$(mktemp -d "$PWD/dist/notarization.XXXXXX")"
 echo "Signing attempt: $attempt"
 scripts/package-setup.sh --app-only "$attempt"
 app="$attempt/Brave Container Setup.app"
-receiver="$app/Contents/Resources/ContainerReceiver"
-codesign --force --sign "$identity" --options runtime --timestamp "$receiver"
-codesign --force --sign "$identity" --options runtime --timestamp "$app"
-codesign --verify --strict "$receiver"
-codesign --verify --strict "$app"
-for arch in arm64 x86_64; do
-  lipo "$app/Contents/MacOS/ContainerSetup" -verify_arch "$arch"
-  lipo "$receiver" -verify_arch "$arch"
-done
+python3 scripts/release-appcast.py --check-key
+python3 scripts/sign-setup.py "$app" --identity "$identity"
 ditto -c -k --sequesterRsrc --keepParent "$app" "$attempt/submission.zip"
 submit_and_wait() {
   local file="$1" label="$2" submission_id status
@@ -80,4 +75,5 @@ codesign --verify --strict "$image"
 hdiutil verify -quiet "$image"
 spctl --assess --type open --context context:primary-signature --verbose=2 "$image"
 (cd "$attempt" && shasum -a 256 Brave-Container-Adapter.dmg > Brave-Container-Adapter.dmg.sha256)
-echo "Ready for distribution: $image"
+python3 scripts/release-appcast.py "$attempt"
+echo "Ready for distribution: $image, $image.sha256 and $attempt/appcast.xml"

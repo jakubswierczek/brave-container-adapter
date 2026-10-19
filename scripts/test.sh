@@ -7,3 +7,4 @@ fi
 xcrun swift test
 build_dir="$(xcrun swift build --show-bin-path)"
 scripts/test-cli.py --bin-dir "$build_dir"
+python3 scripts/test-updater.py

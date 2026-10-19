@@ -16,7 +16,7 @@ The scripts select `/Applications/Xcode.app` for that invocation if `DEVELOPER_D
 DEVELOPER_DIR=/path/to/Xcode.app/Contents/Developer scripts/test.sh
 ```
 
-The build places `cbc` and `ContainerReceiver` together in `dist/bin`. Keep them together when moving the CLI, or specify `--receiver /absolute/path/to/ContainerReceiver`. Generated apps copy the receiver into `Contents/MacOS`; they do not depend on `dist`, `.build`, or this checkout. Runtime dependencies are system frameworks and Swift libraries.
+The build places `cbc` and `ContainerReceiver` together in `dist/bin`. Keep them together when moving the CLI, or specify `--receiver /absolute/path/to/ContainerReceiver`. Generated apps copy the receiver into `Contents/MacOS`; they do not depend on `dist`, `.build`, or this checkout. Destination apps and the CLI depend on system frameworks and Swift libraries. Setup also embeds Sparkle for signed in-app updates.
 
 
 ## Repository checks
@@ -30,7 +30,7 @@ scripts/package-setup.sh
 
 `check-repo.py` validates documentation links, the instruction symlink, shell syntax, and tracked-file hygiene. The macOS CI workflow runs these checks plus tests, release build and local DMG packaging. It uses read-only repository permissions, a pinned checkout action, and no signing secrets. The aggregate `checks` job is the required branch check. See [maintenance](maintenance.md) for runner retirement and release policy.
 
-The package has no third-party Swift dependencies. Runtime APIs require macOS 14. Minimum deployment target is not proof of runtime compatibility; see [testing](testing.md).
+Setup uses a pinned Sparkle dependency. See [updates](updates.md) for its packaging and release requirements. Runtime APIs require macOS 14. Minimum deployment target is not proof of runtime compatibility; see [testing](testing.md).
 
 ## Version and packaging
 

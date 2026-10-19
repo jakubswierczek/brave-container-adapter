@@ -30,10 +30,16 @@ public enum IconPreset: String, CaseIterable, Codable, Sendable {
     }
 }
 
+public enum CustomIconStyle: String, CaseIterable, Sendable {
+    case original, macOS
+
+    public var title: String { self == .original ? "Original" : "macOS style" }
+}
+
 public enum AppIcon: Sendable {
     case generated(IconPreset)
     /// Normalized ICNS bytes. No source filename or image metadata is stored.
-    case custom(Data)
+    case custom(Data, style: CustomIconStyle = .original)
 }
 
 @MainActor
@@ -76,11 +82,30 @@ public enum DestinationIcons {
 
     private static func render(icon: AppIcon, configuration: DestinationConfiguration, sizes: [(Int, String)]) throws -> Data {
         switch icon {
-        case .custom(let data):
-            guard data.count <= 32 * 1024 * 1024, data.starts(with: Data("icns".utf8)), NSImage(data: data) != nil else {
+        case .custom(let data, let style):
+            guard data.count <= 32 * 1024 * 1024, data.starts(with: Data("icns".utf8)), let image = NSImage(data: data) else {
                 throw AdapterError("The saved app icon cannot be read. Choose another icon.")
             }
-            return data
+            guard style == .macOS else { return data }
+            return try encode(sizes: sizes) { rect in
+                let s = rect.width
+                let tileRect = rect.insetBy(dx: s * 0.10, dy: s * 0.10)
+                let tile = NSBezierPath(roundedRect: tileRect, xRadius: s * 0.18, yRadius: s * 0.18)
+                NSGraphicsContext.saveGraphicsState()
+                let shadow = NSShadow()
+                shadow.shadowColor = NSColor.black.withAlphaComponent(0.22)
+                shadow.shadowBlurRadius = s * 0.035
+                shadow.shadowOffset = NSSize(width: 0, height: -s * 0.015)
+                shadow.set()
+                NSColor(srgbRed: 0.97, green: 0.97, blue: 0.98, alpha: 1).setFill()
+                tile.fill()
+                NSGraphicsContext.restoreGraphicsState()
+                NSGraphicsContext.saveGraphicsState()
+                tile.addClip()
+                // The normalized square preserves the imported artwork's aspect ratio.
+                image.draw(in: tileRect)
+                NSGraphicsContext.restoreGraphicsState()
+            }
         case .generated(let preset):
             return try encode(sizes: sizes) { rect in
                 let s = rect.width
