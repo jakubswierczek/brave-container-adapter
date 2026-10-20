@@ -83,10 +83,11 @@ public enum DestinationIcons {
     private static func render(icon: AppIcon, configuration: DestinationConfiguration, sizes: [(Int, String)]) throws -> Data {
         switch icon {
         case .custom(let data, let style):
-            guard data.count <= 32 * 1024 * 1024, data.starts(with: Data("icns".utf8)), let image = NSImage(data: data) else {
+            guard data.count <= 32 * 1024 * 1024, data.starts(with: Data("icns".utf8)), NSImage(data: data) != nil else {
                 throw AdapterError("The saved app icon cannot be read. Choose another icon.")
             }
             guard style == .macOS else { return data }
+            let artwork = try unpaddedArtwork(data)
             return try encode(sizes: sizes) { rect in
                 let s = rect.width
                 let tileRect = rect.insetBy(dx: s * 0.10, dy: s * 0.10)
@@ -102,8 +103,10 @@ public enum DestinationIcons {
                 NSGraphicsContext.restoreGraphicsState()
                 NSGraphicsContext.saveGraphicsState()
                 tile.addClip()
-                // The normalized square preserves the imported artwork's aspect ratio.
-                image.draw(in: tileRect)
+                let scale = max(tileRect.width / artwork.size.width, tileRect.height / artwork.size.height)
+                let size = NSSize(width: artwork.size.width * scale, height: artwork.size.height * scale)
+                artwork.draw(in: NSRect(x: tileRect.midX - size.width / 2, y: tileRect.midY - size.height / 2,
+                                       width: size.width, height: size.height))
                 NSGraphicsContext.restoreGraphicsState()
             }
         case .generated(let preset):
@@ -127,6 +130,35 @@ public enum DestinationIcons {
                 mark.draw(at: NSPoint(x: (s - size.width) / 2, y: (s - size.height) / 2), withAttributes: attrs)
             }
         }
+    }
+
+    /// Remove transparent normalization padding before applying a centered fill crop.
+    private static func unpaddedArtwork(_ data: Data) throws -> NSImage {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let index = (0..<CGImageSourceGetCount(source)).max(by: {
+                  dimensions(source, $0).width < dimensions(source, $1).width
+              }),
+              let image = CGImageSourceCreateImageAtIndex(source, index, nil),
+              let context = CGContext(data: nil, width: image.width, height: image.height,
+                  bitsPerComponent: 8, bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),
+              let pixels = context.data?.assumingMemoryBound(to: UInt8.self) else {
+            throw AdapterError("The saved app icon cannot be read. Choose another icon.")
+        }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        var minX = image.width, minY = image.height, maxX = -1, maxY = -1
+        for y in 0..<image.height {
+            for x in 0..<image.width where pixels[y * context.bytesPerRow + x * 4 + 3] > 0 {
+                minX = min(minX, x); maxX = max(maxX, x)
+                minY = min(minY, y); maxY = max(maxY, y)
+            }
+        }
+        guard maxX >= minX, maxY >= minY,
+              let cropped = image.cropping(to: CGRect(x: minX, y: minY,
+                  width: maxX - minX + 1, height: maxY - minY + 1)) else {
+            return NSImage(cgImage: image, size: .zero)
+        }
+        return NSImage(cgImage: cropped, size: .zero)
     }
 
     private static func dimensions(_ source: CGImageSource, _ index: Int) -> (width: Int, height: Int) {

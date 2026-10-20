@@ -17,7 +17,7 @@ Run the commands in [development](development.md). Swift Testing uses synthetic
 - Signing timeout/cancellation, failed swaps, rollback failures and retry recovery.
 - Real CLI parsing, safe diagnostics, generation/customization and read-only fixture hashes.
 - Copyable diagnostics: JSON shapes, schema error paths, missing files, home-path redaction, private-value omission and all readiness failures.
-- Custom icon styling: aspect ratio, transparent corners, optional clipping, original-image retention, repeated saves and legacy appearance compatibility.
+- Custom icon styling: landscape/portrait center-fill crops, transparent corners, optional clipping, original-image retention, repeated saves and legacy appearance compatibility.
 - Update packaging: public-key validation, disabled automatic updates, versioned appcast metadata, changed-archive rejection and mismatched-key rejection.
 
 `scripts/test.sh` runs Swift tests and the process-level CLI checks. CI runs tests

@@ -25,9 +25,9 @@ import Testing
     return icon
 }
 
-@Test @MainActor func macOSIconPreservesAspectRatioAndTransparentCornersAtEverySize() throws {
+@Test(arguments: [60, 240]) @MainActor func macOSIconFillsTileAndPreservesTransparentCornersAtEverySize(height: Int) throws {
     let f = try Fixture()
-    guard case .custom(let original, _) = try rectangularIcon(in: f.root) else { return }
+    guard case .custom(let original, _) = try rectangularIcon(in: f.root, height: height) else { return }
     let config = try DestinationConfiguration(destination: f.destination, displayName: "Logo")
     let data = try DestinationIcons.data(for: .custom(original, style: .macOS), configuration: config)
     #expect(data != original)
@@ -45,7 +45,7 @@ import Testing
         #expect(try #require(bitmap.colorAt(x: 0, y: 0)).alphaComponent == 0)
         let tile = try #require(bitmap.colorAt(x: size / 2, y: size / 5)).usingColorSpace(.deviceRGB)
         #expect(try #require(tile).redComponent > 0.9)
-        #expect(try #require(tile).greenComponent > 0.9)
+        #expect(try #require(tile).greenComponent < 0.1)
         #expect(try #require(tile).alphaComponent > 0.99)
         var xs: [Int] = [], ys: [Int] = []
         for y in 0..<size {
@@ -58,7 +58,7 @@ import Testing
         }
         let width = try #require(xs.max()) - #require(xs.min()) + 1
         let height = try #require(ys.max()) - #require(ys.min()) + 1
-        #expect(abs(width - 2 * height) <= 2)
+        #expect(abs(width - height) <= 2)
         #expect(abs((try #require(xs.min()) + #require(xs.max())) - (size - 1)) <= 2)
         #expect(abs((try #require(ys.min()) + #require(ys.max())) - (size - 1)) <= 2)
     }
