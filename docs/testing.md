@@ -25,9 +25,11 @@ Run the commands in [development](development.md). Swift Testing uses synthetic
 - Update packaging: public-key validation, disabled automatic updates, versioned appcast metadata, changed-archive rejection and mismatched-key rejection.
 
 `scripts/test.sh` runs Swift tests and the process-level CLI checks. CI runs tests
-and release builds on `macos-14`, `macos-15` and `macos-15-intel`; macOS 15 also
+and release builds on `macos-15`, `macos-15-intel` and `macos-26`; macOS 15 also
 packages both architectures. The `checks` job succeeds only if every matrix job passes.
 Runtime tests exercise synthetic adapter behavior; they do not launch Brave.
+The macOS 14 runner was retired on 2026-11-02. The deployment target remains
+macOS 14, but this version has no current macOS 14 runtime CI coverage.
 
 Tests do not open Brave or use personal browser data. Packaging tests use a harmless
 system executable. Passing them does not certify browser routing.

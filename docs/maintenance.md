@@ -6,8 +6,8 @@ maintenance. There is no response-time, service-level or bounty commitment.
 
 ## Compatibility policy
 
-The deployment target is macOS 14. CI exercises adapter logic on macOS 14/15 and
-Intel macOS 15. Universal binary slices do not certify browser handoff on every OS.
+The deployment target is macOS 14. CI exercises adapter logic on macOS 15/26 and
+Intel macOS 15. Current CI does not run on macOS 14. Universal binary slices do not certify browser handoff on every OS.
 The current routing evidence and missing manual checks are in [testing](testing.md).
 
 Named routing was inspected for Brave 1.92.140; temporary routing for 1.95.101.
@@ -17,9 +17,9 @@ Brave release, inspect the matching source tag and rerun the disposable-profile
 matrix. If routing changes, document the failure and release a fix before claiming
 support. Do not infer support from Brave's development branch.
 
-GitHub retires its macOS 14 runner on 2026-11-02. Before then, move minimum-OS testing
-to a maintained runner, or raise the deployment target and document the change.
-Do not silently remove the oldest-OS check while retaining a tested-runtime claim.
+GitHub retired its macOS 14 runner on 2026-11-02. The matrix now includes macOS 26
+instead. The macOS 14 deployment target remains, but current changes need separate
+macOS 14 runtime verification; earlier CI results are historical evidence only.
 See the [runner retirement notice](https://github.com/actions/runner-images/issues/13518).
 
 ## Change and release controls
