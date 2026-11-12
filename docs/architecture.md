@@ -94,7 +94,19 @@ The receiver validates the entire incoming batch, loads its destination, and rea
 
 For Temporary, `--temporary-container` replaces `--container=Current Name`. It never sends both switches; a container name would make Brave reuse a named temporary container.
 
-These are separate `Process.arguments` elements, not a shell command. `open -a Brave --args` is not used. Brave handles its existing-instance handoff. The adapter uses Chromium's POSIX hostname (`gethostname`), not Foundation's potentially different DNS name. It checks the data directory's singleton owner and rejects a different running installation or an owner it cannot establish. A malformed, foreign-host or unreadable singleton lock fails closed. A stale lock with no live process permits launch. Activation targets that browser process after the handoff; a live check must still confirm the intended profile window. Failure to confirm foreground activation within about nine seconds produces an error; it does not resend the URL.
+These are separate `Process.arguments` elements, not a shell command. `open -a Brave --args` is not used. Brave handles its existing-instance handoff. The adapter uses Chromium's POSIX hostname (`gethostname`), not Foundation's potentially different DNS name. It checks the data directory's singleton owner and rejects a different running installation or an owner it cannot establish. A malformed or unreadable singleton lock fails closed. A stale same-host lock with no live process permits launch.
+
+If the hostname differs, the adapter requires independent local ownership proof:
+matching `SingletonCookie` symlink tokens at the profile and socket directory,
+a Unix socket owned by the current user on a local filesystem, and a kernel-reported
+`LOCAL_PEERPID` matching the live lock PID. It opens an empty, nonblocking connection
+with at most a 100 ms connection wait; no URL or command is sent. Tokens and endpoint
+are rechecked after connection, then the lock target and executable are rechecked.
+These tokens are Chromium singleton metadata, not browser cookies. No lock or
+browser data is modified. An unverified foreign-host lock still fails closed,
+including one whose PID happens to match a local Brave process.
+
+Activation targets that browser process after the handoff; a live check must still confirm the intended profile window. Failure to confirm foreground activation within about nine seconds produces an error; it does not resend the URL.
 
 HTTP/HTTPS text from raw URL Apple events is passed unchanged after validation, including percent escapes, Unicode, queries and fragments. AppKit-batched URLs use the representation AppKit supplies; the adapter cannot undo normalization already performed by a sender or macOS. Unsupported schemes, invalid escapes, whitespace/control characters, and empty hosts are rejected. Batches larger than the conservative 128 KiB argument budget are rejected with an error; split them into smaller batches.
 

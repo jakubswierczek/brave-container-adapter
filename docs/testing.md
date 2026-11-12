@@ -14,6 +14,10 @@ Run the commands in [development](development.md). Swift Testing uses synthetic
 - Queue count/byte limits, FIFO, duplicate events and atomic batch rejection.
 - Bounded reads, oversized files, symlinks and special-file rejection.
 - Browser ownership, stale/foreign locks and safe activation selection.
+- Hostname-change recovery using disposable Unix sockets and a separate `nc` process;
+  wrong peers, mismatched/missing singleton tokens, dead sockets, malformed locks,
+  changed lock targets and wrong installations remain rejected. These are OS socket
+  checks, not evidence of Brave GUI routing on the affected Mac.
 - Signing timeout/cancellation, failed swaps, rollback failures and retry recovery.
 - Real CLI parsing, safe diagnostics, generation/customization and read-only fixture hashes.
 - Copyable diagnostics: JSON shapes, schema error paths, missing files, home-path redaction, private-value omission and all readiness failures.

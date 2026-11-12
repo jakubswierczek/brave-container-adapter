@@ -58,6 +58,10 @@ public enum Diagnostics {
         switch BrowserOwnershipProbe().inspect(userData: paths.userData) {
         case .available: ownerLines.append("  state: available"); ownerLines.append("  matches executable: not applicable")
         case .unknown: ownerLines.append("  state: unknown"); ownerLines.append("  matches executable: unknown")
+        case .hostnameMismatch:
+            ownerLines += ["  state: hostname mismatch", "  matches executable: unverified",
+                           "  reason: lock hostname differs; local socket owner could not be verified",
+                           "  recovery: Quit Brave completely with Command-Q, reopen it, then retry."]
         case .running(let pid, let executable):
             ownerLines += ["  state: running", "  pid: \(pid)", "  executable: \(executable.path)",
                            "  matches executable: \(executable.resolvingSymlinksInPath() == paths.executable.resolvingSymlinksInPath())"]

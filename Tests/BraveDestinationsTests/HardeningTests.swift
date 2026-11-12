@@ -66,7 +66,7 @@ import Testing
         pid == 123 ? URL(fileURLWithPath: "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser") : nil
     })
     #expect(probe.inspect(userData: f.paths.userData) == .available)
-    for (target, expected) in [("test-host-999", BrowserOwner.available), ("foreign-host-999", .unknown), ("test-host-0", .unknown), ("test-host-456", .unknown)] {
+    for (target, expected) in [("test-host-999", BrowserOwner.available), ("foreign-host-999", .hostnameMismatch), ("test-host-0", .unknown), ("test-host-456", .unknown)] {
         try FileManager.default.createSymbolicLink(atPath: lock.path, withDestinationPath: target)
         #expect(probe.inspect(userData: f.paths.userData) == expected)
         try FileManager.default.removeItem(at: lock)

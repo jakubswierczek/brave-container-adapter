@@ -50,12 +50,22 @@ Check these in order:
 | Temporary is unavailable | Requires Brave 1.95.101+, initialized profile, and explicitly saved container enablement. |
 | Container deleted or duplicate name | Fix the configuration in Brave's UI. The adapter cannot choose an ambiguous target. |
 | Wrong installation owns data | Quit the other test instance or choose its matching installation. Do not run two installations against one data directory. |
+| Profile lock names a different hostname | Version 1.6.2 verifies the local socket owner before allowing launch despite a hostname mismatch. If verification fails, quit Brave completely with Command-Q, reopen it, then retry. Do not delete its live lock. |
 | Receiver is running | Quit the matching destination's `ContainerReceiver` in Activity Monitor before updating. |
 | Old name/icon in switcher | Remove its cached entry and add the generated app again. |
 | Setup is blocked by Gatekeeper | Use the current release DMG and check its checksum. Report the exact macOS dialog and version. Do not disable Gatekeeper globally. |
 | `Testing` module missing | Run [tests with full Xcode](development.md). Do not change global `xcode-select` for this project. |
 
 For a trusted local build, Apple's [Open Anyway procedure](https://support.apple.com/en-us/102445) may be needed. This is not a substitute for verifying a downloaded release.
+
+After installing Setup 1.6.2, regenerate existing destinations: quit the matching
+receiver, use **Edit installed app…**, select the destination, and save with
+**Save app**. Repeat for each affected app. Setup updates alone do not
+replace their embedded receivers. The hostname recovery is shared by Setup
+diagnostics, `cbc doctor`, and newly generated destination apps. Diagnostics report
+an unverified hostname mismatch explicitly without exposing hostnames or singleton
+tokens. Ownership probes can open an empty local socket connection; they send no
+browser command and do not launch or quit Brave.
 
 Do not paste full URLs, query parameters, browser preference files, or private paths into an issue. `list` and `doctor` show profile/container metadata; redact it before sharing. Provide app version, macOS version, Brave version, destination mode, and a neutral `example.com` reproduction.
 

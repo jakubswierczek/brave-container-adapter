@@ -196,7 +196,7 @@ private func run() async throws {
         switch owner {
         case .available: print("Data directory: no live local singleton owner")
         case .running: print("Data directory: owned by the selected Brave executable")
-        case .unknown: break // validate above reports a safe diagnostic.
+        case .unknown, .hostnameMismatch: break // validate above reports a safe diagnostic.
         }
         print("Inspection is read-only. GUI container selection is not confirmed by doctor.")
         print("Named routing baseline: Brave 1.92.140. Temporary routing requires 1.95.101+. Verify routing after Brave updates.")
